@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UsbNetBridge privacy policy</title>
+  <style>
+    body { font-family: Segoe UI, system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; padding: 0 1.25rem; line-height: 1.55; color: #122; }
+    h1 { font-size: 1.6rem; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { border: 1px solid #ccd; padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; }
+  </style>
+</head>
+<body>
+  <h1>Privacy policy — UsbNetBridge</h1>
+  <p>Last updated: 10 September 2026</p>
+  <p>UsbNetBridge shares USB devices from a USB host (today: an Android device with USB OTG) to a Windows PC on the <strong>same local network</strong>. It does not use a cloud account.</p>
+  <h2>What the Android app does</h2>
+  <ul>
+    <li>Listens on your local network (USB/IP on TCP 3240, discovery on UDP 3241, events on UDP 3242) so the Windows client can find this device and attach USB devices you plug in.</li>
+    <li>Shows this device’s local IP address in the app so you can connect if automatic discovery fails.</li>
+    <li>Uses a foreground notification while sharing is on, so the server can keep running.</li>
+    <li>Asks for USB permission when you plug in a device. USB access stays on this device unless you tap Allow.</li>
+  </ul>
+  <h2>Data we collect</h2>
+  <p><strong>We do not collect, sell, or send your data to UsbNetBridge servers.</strong> There is no account, no analytics SDK, and no advertising.</p>
+  <p>Information that stays on your devices / LAN:</p>
+  <ul>
+    <li>USB device names and identifiers (needed so the PC can attach the right device)</li>
+    <li>Local IP addresses of the USB host and the PC</li>
+    <li>Optional saved PC addresses and auto-connect preferences on the Windows client</li>
+  </ul>
+  <p>Anyone on the same network who runs a USB/IP client could try to attach a device while the Android app is Started. Only start sharing on a network you trust. Do not port-forward TCP 3240 to the internet.</p>
+  <h2>Permissions (Android)</h2>
+  <table>
+    <tr><th>Permission</th><th>Why</th></tr>
+    <tr><td>Internet</td><td>Talk to the PC on your LAN</td></tr>
+    <tr><td>Wi‑Fi / multicast</td><td>Find the app from the PC on the local network</td></tr>
+    <tr><td>USB host</td><td>Read/write the plugged-in USB device</td></tr>
+    <tr><td>Foreground service (special use)</td><td>Keep sharing alive while the screen is off</td></tr>
+    <tr><td>Notifications</td><td>Show that sharing is running</td></tr>
+  </table>
+  <h2>Children</h2>
+  <p>UsbNetBridge is not directed at children and does not knowingly collect personal information from children.</p>
+  <h2>Contact</h2>
+  <p>Open an issue on the <a href="https://github.com/appzbynate/UsbNetBridge">UsbNetBridge GitHub repository</a>.</p>
+</body>
+</html>

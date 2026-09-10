@@ -1,0 +1,12 @@
+UsbNetBridge
+Copyright (C) 2026 UsbNetBridge contributors
+
+This program is free software under the GNU General Public License
+version 3 (see LICENSE).
+
+The Android USB/IP server stack (`org.cgutman.usbip.*` and `jni/usblib`)
+is adapted from USBIPServerForAndroid by Cameron Gutman and contributors:
+
+  https://github.com/cgutman/USBIPServerForAndroid
+
+See android/THIRD_PARTY.md and android/THIRD_PARTY_USBIP_SERVER_LICENSE.

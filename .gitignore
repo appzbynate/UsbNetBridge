@@ -1,0 +1,27 @@
+# Root
+.DS_Store
+Thumbs.db
+*.log
+.env
+.venv/
+__pycache__/
+*.pyc
+_vendor_usbip/
+
+# IDE
+.idea/
+.vscode/
+*.user
+
+# Android / .NET
+**/build/
+**/bin/
+**/obj/
+**/local.properties
+**/.cxx/
+
+# Signing — never commit
+*.jks
+*.keystore
+keystore.properties
+*.aab

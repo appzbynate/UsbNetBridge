@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Filters used for the system “Open with UsbNetBridge?” dialog when a device is plugged in.
+  Include common classes plus a catch-all so OEM mice/dongles still match.
+  User can tap Always to auto-open this app for that device next time (Start is still manual).
+-->
+<resources>
+    <!-- Catch-all (any USB device) -->
+    <usb-device />
+
+    <!-- Device class 0 = defined at interface (very common for mice/keyboards) -->
+    <usb-device class="0" />
+
+    <!-- HID -->
+    <usb-device class="3" />
+
+    <!-- Mass storage / hub / vendor-specific (misc OTG gadgets) -->
+    <usb-device class="8" />
+    <usb-device class="9" />
+    <usb-device class="255" />
+</resources>

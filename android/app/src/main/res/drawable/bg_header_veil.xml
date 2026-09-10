@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!-- Soft wash so the title logo stays readable over the circuit backdrop. -->
+    <gradient
+        android:angle="270"
+        android:endColor="#000C1630"
+        android:startColor="#E60C1630" />
+</shape>

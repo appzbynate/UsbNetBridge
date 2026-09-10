@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.UsbNetBridge" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorPrimaryVariant">@color/accent_dark</item>
+        <item name="colorOnPrimary">@color/on_accent</item>
+        <item name="colorSecondary">@color/accent_hot</item>
+        <item name="colorOnSecondary">@color/ink</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:textColorPrimary">@color/ink</item>
+        <item name="android:textColorSecondary">@color/muted</item>
+        <item name="materialButtonStyle">@style/Widget.UsbNetBridge.Button</item>
+    </style>
+
+    <style name="Widget.UsbNetBridge.Button" parent="Widget.MaterialComponents.Button">
+        <item name="cornerRadius">12dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="backgroundTint">@color/btn_primary_background</item>
+        <item name="android:textColor">@color/btn_primary_text</item>
+        <item name="android:textStyle">bold</item>
+        <item name="elevation">4dp</item>
+    </style>
+
+    <style name="Widget.UsbNetBridge.Button.Outlined" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="cornerRadius">12dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="strokeColor">@color/accent_hot</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:textColor">@color/ink</item>
+        <item name="backgroundTint">@color/surface_lite</item>
+    </style>
+
+    <style name="Widget.UsbNetBridge.Button.Text" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:minHeight">40dp</item>
+        <item name="android:textColor">@color/accent</item>
+    </style>
+
+    <style name="Text.UsbNetBridge.Title" parent="TextAppearance.MaterialComponents.Headline5">
+        <item name="android:textColor">@color/ink</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.02</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="Text.UsbNetBridge.Section" parent="TextAppearance.MaterialComponents.Subtitle2">
+        <item name="android:textColor">@color/accent</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:shadowColor">#CC0C1630</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">4</item>
+    </style>
+
+    <style name="Text.UsbNetBridge.Body" parent="TextAppearance.MaterialComponents.Body2">
+        <item name="android:textColor">@color/muted</item>
+        <item name="android:lineSpacingMultiplier">1.15</item>
+        <item name="android:shadowColor">#990C1630</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">3</item>
+    </style>
+
+    <style name="Text.UsbNetBridge.Mono" parent="TextAppearance.MaterialComponents.Body1">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textColor">@color/ink</item>
+    </style>
+</resources>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Match Windows client: deep blue / cyan / indigo -->
+    <color name="bg">#FF0C1630</color>
+    <color name="bg_mid">#FF162448</color>
+    <color name="surface">#FF20305C</color>
+    <color name="surface_lite">#FF2A3E76</color>
+    <color name="input_bg">#FF121C3A</color>
+    <color name="ink">#FFF5FAFF</color>
+    <color name="muted">#FFAABEDE</color>
+    <color name="line">#FF4664AA</color>
+    <color name="accent">#FF38D2E8</color>
+    <color name="accent_dark">#FF28A8BC</color>
+    <color name="accent_hot">#FF788CFF</color>
+    <color name="accent_soft">#FF1A3558</color>
+    <color name="on_accent">#FF0A1428</color>
+    <color name="accent_disabled">#FF3A4A68</color>
+    <color name="on_accent_disabled">#FF7A90B0</color>
+    <color name="danger">#FFFF6E78</color>
+    <color name="warning">#FFFFB020</color>
+    <color name="ok">#FF48D2A0</color>
+    <color name="status_stopped">#FF8A9CB8</color>
+    <color name="status_waiting">#FF38D2E8</color>
+    <color name="status_sharing">#FF48D2A0</color>
+    <color name="log_bg">#FF0A1024</color>
+    <color name="log_fg">#FFB4D2E6</color>
+    <!-- Adaptive icon plate — matches dark art interior (not white) -->
+    <color name="ic_launcher_background">#FF0A0A1E</color>
+</resources>
