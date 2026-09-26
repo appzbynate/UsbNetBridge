@@ -13,9 +13,6 @@
     <AssemblyName>UsbNetBridge.Client</AssemblyName>
     <LangVersion>latest</LangVersion>
     <!-- One output folder so there is only ever one EXE to launch. -->
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <OutputPath>$(MSBuildThisFileDirectory)bin\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>

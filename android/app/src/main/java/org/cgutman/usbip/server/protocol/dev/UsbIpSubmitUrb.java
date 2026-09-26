@@ -33,6 +33,9 @@ public class UsbIpSubmitUrb extends UsbIpDevicePacket {
 		ByteBuffer bb = ByteBuffer.wrap(continuationHeader).order(ByteOrder.BIG_ENDIAN);
 		msg.transferFlags = bb.getInt();
 		msg.transferBufferLength = bb.getInt();
+		if (msg.transferBufferLength < 0 || msg.transferBufferLength > 65536) {
+			throw new IOException("Invalid transferBufferLength: " + msg.transferBufferLength);
+		}
 		msg.startFrame = bb.getInt();
 		msg.numberOfPackets = bb.getInt();
 		msg.interval = bb.getInt();

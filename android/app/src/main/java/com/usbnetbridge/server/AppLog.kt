@@ -35,7 +35,10 @@ object AppLog {
     }
 
     @Synchronized
-    fun snapshot(): String = lines.joinToString("\n")
+    fun snapshot(): String {
+        val s = lines.joinToString("\n")
+        return if (s.isBlank()) "(no events yet)" else s
+    }
 
     fun addListener(listener: (String) -> Unit) {
         listeners.add(listener)

@@ -32,6 +32,10 @@ What this app does not claim:
 
 Source code is GPL-3. Corresponding source is on GitHub.
 
+## Graphics (Play Console)
+
+Upload files from [`play-assets/`](play-assets/README.md). Phone shots are the real Android + Windows captures with the shared device highlighted. Promo video is a YouTube URL, not the MP4 itself.
+
 ## Category
 
 Tools / Productivity

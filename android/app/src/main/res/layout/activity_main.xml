@@ -5,20 +5,22 @@
     android:layout_height="match_parent"
     android:background="@drawable/bg_screen">
 
-    <!-- Circuit backdrop — shows in gutters around the cards. -->
+    <!-- Background Circuit Traces Matching Mockup -->
     <ImageView
+        android:id="@+id/bgCircuit"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:scaleType="centerCrop"
         android:contentDescription="@null"
         android:importantForAccessibility="no"
-        android:scaleType="centerCrop"
-        android:src="@drawable/bg_circuit" />
+        android:src="@drawable/bg_circuit"
+        android:alpha="0.38" />
 
+    <!-- Atmospheric Dark Veil so Cards and Text Pop -->
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/bg_circuit_scrim"
-        android:importantForAccessibility="no" />
+        android:background="#40080C14" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -32,91 +34,144 @@
             android:orientation="vertical"
             android:paddingHorizontal="20dp"
             android:paddingTop="20dp"
-            android:paddingBottom="28dp">
+            android:paddingBottom="32dp">
 
-            <!-- Title area with veil so the logo stays clear over the circuit. -->
-            <LinearLayout
+            <!-- Brand Header: Sleek 2-Tone UsbNet (Cyan) + Bridge (White) with larger bold letters -->
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_header_veil"
-                android:orientation="vertical"
-                android:paddingBottom="10dp">
+                android:paddingTop="14dp"
+                android:paddingBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerInParent="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
                 <ImageView
-                    android:id="@+id/titleLogo"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:adjustViewBounds="true"
+                    android:id="@+id/brandIcon"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:layout_marginEnd="14dp"
                     android:contentDescription="@string/app_name"
-                    android:scaleType="fitStart"
-                    android:src="@drawable/title_logo" />
+                    android:src="@drawable/ic_brand_logo" />
 
-                <TextView
-                    android:layout_width="match_parent"
+                <LinearLayout
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="@string/tagline"
-                    android:textAppearance="@style/Text.UsbNetBridge.Body" />
-            </LinearLayout>
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-            <!-- Status card -->
+                    <TextView
+                        android:id="@+id/brandTitleUsbNet"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-bold"
+                        android:letterSpacing="-0.02"
+                        android:text="UsbNet"
+                        android:textColor="#00F0FF"
+                        android:textSize="36sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/brandTitleBridge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-bold"
+                        android:letterSpacing="-0.02"
+                        android:text="Bridge"
+                        android:textColor="#FFFFFF"
+                        android:textSize="36sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+                </LinearLayout>
+
+                <ImageView
+                    android:id="@+id/showLogsButton"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/ic_menu_sort_by_size"
+                    android:tint="@color/muted"
+                    android:contentDescription="View Logs" />
+            </RelativeLayout>
+
+            <!-- Status Capsule Matching Mockup -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_card"
-                android:elevation="6dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:padding="16dp">
-
-                <View
-                    android:id="@+id/statusDot"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
-                    android:background="@drawable/status_dot" />
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_status_capsule"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingVertical="14dp">
 
                 <TextView
                     android:id="@+id/statusText"
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
+                    android:gravity="center"
                     android:text="@string/status_stopped"
                     android:textColor="@color/ink"
-                    android:textSize="16sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:id="@+id/statusDot"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/status_dot" />
+
+                    <TextView
+                        android:id="@+id/statusSubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/status_stopped_sub"
+                        android:textColor="@color/muted"
+                        android:textSize="14sp" />
+                </LinearLayout>
             </LinearLayout>
 
+            <!-- Hidden lastEventText to preserve binding without visual clutter -->
             <TextView
                 android:id="@+id/lastEventText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:ellipsize="end"
-                android:maxLines="2"
-                android:text="—"
-                android:textAppearance="@style/Text.UsbNetBridge.Body"
-                android:textIsSelectable="true"
-                android:textSize="12sp" />
+                android:visibility="gone" />
 
-            <!-- Connect -->
+            <!-- Section 1: "1. Share to PC" -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="28dp"
-                android:text="@string/section_connect"
-                android:textAppearance="@style/Text.UsbNetBridge.Section" />
+                android:layout_marginTop="26dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="1. Share to PC"
+                android:textColor="@color/ink"
+                android:textSize="17sp"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_card"
-                android:elevation="6dp"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
+                <!-- Row 1: Wi-Fi Icon + Monospace IP Endpoint + Copy Capsule Button -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -124,8 +179,16 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:paddingStart="14dp"
-                    android:paddingEnd="4dp"
-                    android:paddingVertical="6dp">
+                    android:paddingEnd="8dp"
+                    android:paddingVertical="8dp">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_marginEnd="12dp"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_wifi" />
 
                     <TextView
                         android:id="@+id/endpointText"
@@ -133,61 +196,79 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:fontFamily="monospace"
-                        android:lineSpacingExtra="4dp"
                         android:text="@string/endpoint_idle"
                         android:textColor="@color/ink"
                         android:textIsSelectable="true"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
-                    <com.google.android.material.button.MaterialButton
+                    <Button
                         android:id="@+id/copyEndpointButton"
-                        style="@style/Widget.UsbNetBridge.Button.Text"
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:enabled="false"
-                        android:text="@string/copy_endpoint" />
+                        android:layout_height="36dp"
+                        android:background="@drawable/bg_btn_pill_dark"
+                        android:minWidth="68dp"
+                        android:paddingHorizontal="14dp"
+                        android:stateListAnimator="@null"
+                        android:text="@string/copy_endpoint"
+                        android:textAllCaps="false"
+                        android:textColor="@color/ink"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
 
                 <TextView
                     android:id="@+id/endpointHintText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="8dp"
                     android:text="@string/hint_screen"
-                    android:textAppearance="@style/Text.UsbNetBridge.Body"
-                    android:textSize="12sp" />
+                    android:textColor="@color/muted"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
 
+                <!-- Row 2: Dual Pill Buttons: Start (Cyan) and Stop (Slate) -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="14dp"
                     android:orientation="horizontal">
 
-                    <com.google.android.material.button.MaterialButton
+                    <Button
                         android:id="@+id/startButton"
                         android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="8dp"
+                        android:layout_height="48dp"
+                        android:layout_marginEnd="10dp"
                         android:layout_weight="1"
-                        android:text="@string/start" />
+                        android:background="@drawable/bg_btn_start"
+                        android:stateListAnimator="@null"
+                        android:text="@string/start"
+                        android:textAllCaps="false"
+                        android:textColor="@color/btn_start_text"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
 
-                    <com.google.android.material.button.MaterialButton
+                    <Button
                         android:id="@+id/stopButton"
-                        style="@style/Widget.UsbNetBridge.Button.Outlined"
                         android:layout_width="0dp"
-                        android:layout_height="wrap_content"
+                        android:layout_height="48dp"
                         android:layout_weight="1"
+                        android:background="@drawable/bg_btn_stop"
                         android:enabled="false"
-                        android:text="@string/stop" />
+                        android:stateListAnimator="@null"
+                        android:text="@string/stop"
+                        android:textAllCaps="false"
+                        android:textColor="@color/btn_stop_text"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Devices -->
+            <!-- Section 2: "2. USB devices" -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="28dp"
+                android:layout_marginTop="26dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -195,15 +276,23 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="@string/section_devices"
-                    android:textAppearance="@style/Text.UsbNetBridge.Section" />
+                    android:fontFamily="sans-serif-medium"
+                    android:text="2. USB devices"
+                    android:textColor="@color/ink"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
 
-                <com.google.android.material.button.MaterialButton
+                <TextView
                     android:id="@+id/refreshButton"
-                    style="@style/Widget.UsbNetBridge.Button.Text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/refresh" />
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="8dp"
+                    android:text="@string/refresh"
+                    android:textAllCaps="true"
+                    android:textColor="@color/accent"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <LinearLayout
@@ -211,80 +300,72 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_card"
-                android:elevation="6dp"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
-                <TextView
-                    android:id="@+id/deviceListText"
+                <LinearLayout
+                    android:id="@+id/devicesContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/deviceEmptyLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_well"
-                    android:fontFamily="monospace"
-                    android:lineSpacingExtra="4dp"
-                    android:minHeight="72dp"
-                    android:padding="14dp"
-                    android:text="@string/devices_empty"
-                    android:textColor="@color/ink"
-                    android:textIsSelectable="true"
-                    android:textSize="13sp" />
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="24dp">
+
+                    <ImageView
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:alpha="0.6"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_usb" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="@string/empty_usb_title"
+                        android:textColor="@color/ink"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/deviceListText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
+                        android:text="@string/empty_usb_detail"
+                        android:textColor="@color/muted"
+                        android:textSize="13sp" />
+                </LinearLayout>
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="14dp"
+                    android:lineSpacingExtra="2dp"
                     android:text="@string/hint_usb_always"
-                    android:textAppearance="@style/Text.UsbNetBridge.Body"
+                    android:textColor="@color/muted"
                     android:textSize="12sp" />
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="3dp"
                     android:text="@string/hint_permission"
-                    android:textAppearance="@style/Text.UsbNetBridge.Body"
+                    android:textColor="@color/muted"
                     android:textSize="12sp" />
             </LinearLayout>
-
-            <!-- Log -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="28dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/log_title"
-                    android:textAppearance="@style/Text.UsbNetBridge.Section" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/copyLogButton"
-                    style="@style/Widget.UsbNetBridge.Button.Text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/copy_log" />
-            </LinearLayout>
-
-            <EditText
-                android:id="@+id/logView"
-                android:layout_width="match_parent"
-                android:layout_height="220dp"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_well"
-                android:elevation="4dp"
-                android:focusable="false"
-                android:gravity="top|start"
-                android:importantForAutofill="no"
-                android:inputType="none"
-                android:padding="14dp"
-                android:scrollbars="vertical"
-                android:textColor="@color/log_fg"
-                android:textSize="11sp"
-                android:typeface="monospace" />
 
         </LinearLayout>
     </ScrollView>

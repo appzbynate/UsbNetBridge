@@ -6,22 +6,22 @@ namespace UsbNetBridge.Client;
 /// <summary>Shared premium chrome helpers for the Windows client.</summary>
 internal static class UiTheme
 {
-    public static readonly Color BgDeep = Color.FromArgb(12, 22, 48);
-    public static readonly Color BgMid = Color.FromArgb(22, 36, 72);
-    public static readonly Color CardFace = Color.FromArgb(32, 48, 92);
-    public static readonly Color CardFaceLite = Color.FromArgb(42, 62, 118);
-    public static readonly Color Accent = Color.FromArgb(56, 210, 232);
-    public static readonly Color AccentHot = Color.FromArgb(120, 140, 255);
-    public static readonly Color TextPrimary = Color.FromArgb(245, 250, 255);
-    public static readonly Color TextMuted = Color.FromArgb(150, 175, 210);
-    public static readonly Color OkGreen = Color.FromArgb(72, 210, 160);
-    public static readonly Color Danger = Color.FromArgb(255, 110, 120);
-    public static readonly Color InputBg = Color.FromArgb(14, 22, 48);
-    public static readonly Color CardBorder = Color.FromArgb(90, 130, 200);
-    public static readonly Color RowHover = Color.FromArgb(28, 42, 82);
-    public static readonly Color RowSelected = Color.FromArgb(36, 78, 118);
-    public static readonly Color ChipBg = Color.FromArgb(40, 56, 210, 232);
-    public static readonly Color ChipText = Color.FromArgb(180, 245, 255);
+    public static readonly Color BgDeep = Color.FromArgb(10, 15, 29);
+    public static readonly Color BgMid = Color.FromArgb(7, 11, 20);
+    public static readonly Color CardFace = Color.FromArgb(14, 22, 36);
+    public static readonly Color CardFaceLite = Color.FromArgb(20, 31, 50);
+    public static readonly Color Accent = Color.FromArgb(0, 240, 255);
+    public static readonly Color AccentHot = Color.FromArgb(0, 200, 255);
+    public static readonly Color TextPrimary = Color.FromArgb(241, 245, 249);
+    public static readonly Color TextMuted = Color.FromArgb(130, 155, 185);
+    public static readonly Color OkGreen = Color.FromArgb(0, 229, 163);
+    public static readonly Color Danger = Color.FromArgb(225, 29, 72);
+    public static readonly Color InputBg = Color.FromArgb(7, 11, 18);
+    public static readonly Color CardBorder = Color.FromArgb(60, 84, 115);
+    public static readonly Color RowHover = Color.FromArgb(19, 29, 45);
+    public static readonly Color RowSelected = Color.FromArgb(26, 40, 62);
+    public static readonly Color ChipBg = Color.FromArgb(35, 0, 240, 255);
+    public static readonly Color ChipText = Color.FromArgb(0, 240, 255);
 
     public const int CornerRadius = 22;
     public const int WellRadius = 18;
@@ -153,7 +153,9 @@ internal static class UiTheme
     {
         if (string.IsNullOrWhiteSpace(text) || bounds.Width < 8 || bounds.Height < 8)
             return 0;
-        using var font = new Font("Segoe UI Semibold", 8f);
+        using var font = string.Equals(text, "Connected", StringComparison.OrdinalIgnoreCase)
+            ? new Font("Segoe UI", 8.5f, FontStyle.Bold)
+            : new Font("Segoe UI Semibold", 8f);
         const TextFormatFlags flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
                                       TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding |
                                       TextFormatFlags.GlyphOverhangPadding;
@@ -165,6 +167,8 @@ internal static class UiTheme
         using var path = CreateRoundRect(rect, h / 2);
         using var fill = new SolidBrush(bg);
         g.FillPath(fill, path);
+        using var chipBorder = new Pen(Color.FromArgb(70, fg), 1f);
+        g.DrawPath(chipBorder, path);
         var textRect = rect;
         if (batteryIcon)
         {
@@ -232,7 +236,7 @@ internal static class UiAssets
 /// <summary>Top connect card scene — USB host to PC, matching the splash art.</summary>
 internal sealed class ConnectingHero : Control
 {
-    private static Image? _banner;
+    private static Image? _circuitBg;
     private string _headline = "";
     private string _hint = "";
     private Color _headlineColor = UiTheme.Accent;
@@ -243,8 +247,27 @@ internal sealed class ConnectingHero : Control
                  ControlStyles.OptimizedDoubleBuffer |
                  ControlStyles.ResizeRedraw |
                  ControlStyles.UserPaint, true);
-        BackColor = UiTheme.BgDeep;
-        _banner ??= UiAssets.LoadPng("connecting-banner.png");
+        BackColor = UiTheme.CardFace;
+        AutoSize = true;
+        _circuitBg ??= UiAssets.LoadPng("bg-circuit.png");
+    }
+
+    public override Size GetPreferredSize(Size proposedSize)
+    {
+        var h = 16 + 54; // Top pad + capsuleH
+        if (!string.IsNullOrWhiteSpace(_hint))
+        {
+            using var hintFont = new Font("Segoe UI", 9.25f);
+            var maxW = Math.Max(20, proposedSize.Width - 28);
+            if (maxW < 100) maxW = 400; // fallback if proposedSize is small/0
+            var textH = TextRenderer.MeasureText(_hint, hintFont, new Size(maxW, 0), TextFormatFlags.WordBreak).Height;
+            h += 10 + textH + 14; // gap + text height + bottom padding
+        }
+        else
+        {
+            h += 16; // bottom pad if no hint
+        }
+        return new Size(proposedSize.Width, h);
     }
 
     public string Headline
@@ -298,46 +321,105 @@ internal sealed class ConnectingHero : Control
 
         r.Width -= 1;
         r.Height -= 1;
-        if (_banner != null)
-            UiAssets.DrawCover(g, _banner, r);
-        else
-        {
-            using var fill = new SolidBrush(UiTheme.BgDeep);
-            g.FillRectangle(fill, r);
-        }
 
-        // Keep the art visible; only shade the lower band so type stays readable.
-        var fade = new Rectangle(r.X, r.Y + r.Height / 3, r.Width, r.Height - r.Height / 3);
-        if (fade.Height > 4)
+        using (var fill = new SolidBrush(UiTheme.CardFace))
+            g.FillRectangle(fill, r);
+
+        if (_circuitBg != null && r.Width > 0 && r.Height > 0)
         {
-            using var veil = new LinearGradientBrush(fade,
-                Color.FromArgb(0, 6, 12, 28),
-                Color.FromArgb(150, 6, 12, 28),
-                90f);
-            g.FillRectangle(veil, fade);
+            using var ia = new System.Drawing.Imaging.ImageAttributes();
+            var matrix = new System.Drawing.Imaging.ColorMatrix { Matrix33 = 0.32f };
+            ia.SetColorMatrix(matrix, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
+            var scale = Math.Max(r.Width / (float)_circuitBg.Width, r.Height / (float)_circuitBg.Height);
+            var cw = (int)Math.Ceiling(_circuitBg.Width * scale);
+            var ch = (int)Math.Ceiling(_circuitBg.Height * scale);
+            var cx0 = r.X + (r.Width - cw) / 2;
+            var cy0 = r.Y + (r.Height - ch) / 2;
+            var oldInterp = g.InterpolationMode;
+            g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+            g.DrawImage(_circuitBg, new Rectangle(cx0, cy0, cw, ch), 0, 0, _circuitBg.Width, _circuitBg.Height, GraphicsUnit.Pixel, ia);
+            g.InterpolationMode = oldInterp;
         }
 
         using var headlineFont = UiTheme.TryFont(
-            ("Segoe UI Light", 16.5f, FontStyle.Regular),
-            ("Segoe UI Semilight", 16f, FontStyle.Regular),
-            ("Segoe UI", 15f, FontStyle.Regular));
-        var headlineRect = new RectangleF(12, r.Height * 0.18f, Math.Max(8, r.Width - 24), r.Height * 0.42f);
-        UiTheme.DrawGlowText(g, _headline, headlineFont, _headlineColor, headlineRect,
-            glowSize: 14f);
+            ("Segoe UI", 14.5f, FontStyle.Bold),
+            ("Segoe UI Semibold", 14f, FontStyle.Bold));
+
+        var headText = string.IsNullOrWhiteSpace(_headline) ? "UsbNetBridge" : _headline;
+        var headSize = TextRenderer.MeasureText(headText, headlineFont);
+        var capsuleW = Math.Clamp(headSize.Width + 90, 240, Math.Max(240, r.Width - 48));
+        var capsuleH = 54;
+        var capsuleX = r.X + (r.Width - capsuleW) / 2;
+        var capsuleY = r.Y + 16;
+        var capsuleRect = new Rectangle(capsuleX, capsuleY, capsuleW, capsuleH);
+
+        using (var capPath = UiTheme.CreateRoundRect(capsuleRect, 14))
+        {
+            var outerRect2 = Rectangle.Inflate(capsuleRect, 4, 4);
+            using (var outerPath2 = UiTheme.CreateRoundRect(outerRect2, 18))
+            using (var glowPen2 = new Pen(Color.FromArgb(28, UiTheme.Accent), 4.0f))
+                g.DrawPath(glowPen2, outerPath2);
+
+            var outerRect = Rectangle.Inflate(capsuleRect, 2, 2);
+            using (var outerPath = UiTheme.CreateRoundRect(outerRect, 16))
+            using (var glowPen = new Pen(Color.FromArgb(85, UiTheme.Accent), 2.5f))
+                g.DrawPath(glowPen, outerPath);
+
+            using (var capFill = new LinearGradientBrush(capsuleRect,
+                       Color.FromArgb(12, 24, 43),
+                       Color.FromArgb(8, 16, 30), 90f))
+                g.FillPath(capFill, capPath);
+
+            using var neonPen = new Pen(Color.FromArgb(245, UiTheme.Accent), 2.0f);
+            g.DrawPath(neonPen, capPath);
+        }
+
+        var textRect = new RectangleF(capsuleX + 8, capsuleY + 6, capsuleW - 16, 24);
+        UiTheme.DrawGlowText(g, headText, headlineFont, _headlineColor, textRect, glowSize: 7f, bevel: false);
+
+        // Horizontal USB glyph matching the mockup precisely
+        var glyphY = capsuleY + 36;
+        var cx = capsuleX + capsuleW / 2f;
+        using (var glyphPen = new Pen(UiTheme.Accent, 1.8f))
+        {
+            glyphPen.StartCap = LineCap.Round;
+            glyphPen.EndCap = LineCap.Round;
+
+            // Main stem line
+            g.DrawLine(glyphPen, cx - 24, glyphY, cx + 16, glyphY);
+
+            // Left circular node
+            using var cyanBrush = new SolidBrush(UiTheme.Accent);
+            g.FillEllipse(cyanBrush, cx - 30, glyphY - 3f, 6, 6);
+
+            // Center-right branch to square node
+            g.DrawLine(glyphPen, cx - 8, glyphY, cx + 4, glyphY - 6);
+            g.FillRectangle(cyanBrush, cx + 3, glyphY - 9, 5, 5);
+
+            // Right arrowhead pointing right
+            var arrow = new[]
+            {
+                new PointF(cx + 24, glyphY),
+                new PointF(cx + 16, glyphY - 4),
+                new PointF(cx + 16, glyphY + 4)
+            };
+            g.FillPolygon(cyanBrush, arrow);
+        }
 
         if (!string.IsNullOrWhiteSpace(_hint))
         {
-            using var hintFont = new Font("Segoe UI", 9f);
-            var hintRect = new Rectangle(18, r.Bottom - 40, Math.Max(20, r.Width - 36), 34);
+            using var hintFont = new Font("Segoe UI", 9.25f);
+            var maxW = Math.Max(20, r.Width - 28);
+            var textH = TextRenderer.MeasureText(_hint, hintFont, new Size(maxW, 0), TextFormatFlags.WordBreak).Height;
+            var hintRect = new Rectangle(14, capsuleY + capsuleH + 10, maxW, textH + 5);
             TextRenderer.DrawText(g, _hint, hintFont, hintRect,
-                Color.FromArgb(210, UiTheme.TextMuted),
-                TextFormatFlags.WordBreak | TextFormatFlags.HorizontalCenter |
-                TextFormatFlags.Top | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+                Color.FromArgb(148, 163, 184),
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak);
         }
 
-        using var path = UiTheme.CreateRoundRect(r, 16);
-        using var glow = new Pen(Color.FromArgb(80, UiTheme.Accent), 1.25f);
-        g.DrawPath(glow, path);
+        using var borderPath = UiTheme.CreateRoundRect(r, 16);
+        using var containerBorder = new Pen(UiTheme.CardBorder, 1f);
+        g.DrawPath(containerBorder, borderPath);
     }
 }
 
@@ -375,10 +457,13 @@ internal sealed class SoftSectionTitle : Control
         var g = e.Graphics;
         if (string.IsNullOrWhiteSpace(_title))
             return;
-        using var font = new Font("Segoe UI Semibold", 12f);
-        var bounds = new RectangleF(2, 0, Math.Max(8, Width - 4), Height);
-        UiTheme.DrawGlowText(g, _title, font, UiTheme.Accent, bounds,
-            StringAlignment.Near, StringAlignment.Center, glowSize: 9f, bevel: false);
+        using var font = UiTheme.TryFont(
+            ("Segoe UI Semibold", 12f, FontStyle.Bold),
+            ("Segoe UI", 12f, FontStyle.Bold));
+        var r = ClientRectangle;
+        TextRenderer.DrawText(g, _title, font, new Rectangle(r.X + 2, r.Y, r.Width - 4, r.Height),
+            UiTheme.TextPrimary,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
     }
 }
 
@@ -402,14 +487,24 @@ internal sealed class SoftListBox : Control
                  ControlStyles.Selectable, true);
         TabStop = true;
         ItemHeight = UiTheme.ListItemHeight;
-        BackColor = UiTheme.InputBg;
+        BackColor = UiTheme.CardFace;
         ForeColor = UiTheme.TextPrimary;
         Font = new Font("Segoe UI", 10f);
         Items = new ItemList(this);
     }
 
     public ItemList Items { get; }
-    public int ItemHeight { get; set; }
+    private int _itemHeight;
+    public int ItemHeight
+    {
+        get => _itemHeight;
+        set
+        {
+            if (_itemHeight == value) return;
+            _itemHeight = value;
+            Invalidate();
+        }
+    }
 
     public object? SelectedItem =>
         _selectedIndex >= 0 && _selectedIndex < _items.Count ? _items[_selectedIndex] : null;
@@ -464,7 +559,7 @@ internal sealed class SoftListBox : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-        using (var bg = new SolidBrush(UiTheme.InputBg))
+        using (var bg = new SolidBrush(Parent?.BackColor ?? BackColor))
             g.FillRectangle(bg, ClientRectangle);
 
         if (_items.Count == 0 || ItemHeight <= 0)
@@ -539,22 +634,59 @@ internal sealed class SoftListBox : Control
 
     private void DrawRow(Graphics g, Rectangle bounds, int index, bool selected)
     {
-        using (var bg = new SolidBrush(UiTheme.InputBg))
+        using (var bg = new SolidBrush(Parent?.BackColor ?? BackColor))
             g.FillRectangle(bg, bounds);
 
-        var row = Rectangle.Inflate(bounds, -8, -5);
+        var row = Rectangle.Inflate(bounds, -7, -4);
         if (row.Width < 8 || row.Height < 8)
             return;
 
-        if (selected)
+        var isAttached = index >= 0 && index < _items.Count && _items[index] is AttachedUsbDevice;
+
+        using (var path = UiTheme.CreateRoundRect(row, 10))
         {
-            using var path = UiTheme.CreateRoundRect(row, 10);
-            using var brush = new LinearGradientBrush(row,
-                Color.FromArgb(55, 110, 160),
-                Color.FromArgb(30, 70, 115), 90f);
-            g.FillPath(brush, path);
-            using var border = new Pen(Color.FromArgb(100, UiTheme.Accent), 1f);
-            g.DrawPath(border, path);
+            if (isAttached)
+            {
+                using var brush = new LinearGradientBrush(row,
+                    Color.FromArgb(24, 0, 229, 255),
+                    Color.FromArgb(10, 0, 160, 210), 90f);
+                g.FillPath(brush, path);
+
+                var outer2 = Rectangle.Inflate(row, 2, 2);
+                using var glowPath2 = UiTheme.CreateRoundRect(outer2, 12);
+                using var glow2 = new Pen(Color.FromArgb(25, UiTheme.Accent), 3f);
+                g.DrawPath(glow2, glowPath2);
+
+                var outer = Rectangle.Inflate(row, 1, 1);
+                using var glowPath = UiTheme.CreateRoundRect(outer, 11);
+                using var glow = new Pen(Color.FromArgb(60, UiTheme.Accent), 2f);
+                g.DrawPath(glow, glowPath);
+
+                using var border = new Pen(Color.FromArgb(240, UiTheme.Accent), 1.6f);
+                g.DrawPath(border, path);
+            }
+            else if (selected)
+            {
+                using var brush = new LinearGradientBrush(row,
+                    Color.FromArgb(45, 20, 50, 85),
+                    Color.FromArgb(25, 14, 35, 60), 90f);
+                g.FillPath(brush, path);
+
+                using var border = new Pen(Color.FromArgb(160, UiTheme.Accent), 1.2f);
+                g.DrawPath(border, path);
+
+                var indicator = new Rectangle(row.X + 3, row.Y + 8, 3, Math.Max(4, row.Height - 16));
+                using var indPath = UiTheme.CreateRoundRect(indicator, 2);
+                using var indBrush = new SolidBrush(UiTheme.Accent);
+                g.FillPath(indBrush, indPath);
+            }
+            else
+            {
+                using var fill = new SolidBrush(Color.FromArgb(16, 24, 38));
+                g.FillPath(fill, path);
+                using var border = new Pen(UiTheme.CardBorder, 1.5f);
+                g.DrawPath(border, path);
+            }
         }
 
         ResolveRow(_items[index], out var primary, out var secondary, out var chip, out var extraChip);
@@ -568,19 +700,19 @@ internal sealed class SoftListBox : Control
         var textRightPad = chipsInset == 0 ? 14 : chipsInset + 10;
         var textWidth = Math.Max(20, row.Width - (textLeft - row.X) - textRightPad);
         var primaryRect = string.IsNullOrWhiteSpace(secondary)
-            ? new Rectangle(textLeft, row.Y + Math.Max(0, (row.Height - 24) / 2), textWidth, 24)
-            : new Rectangle(textLeft, row.Y + 8, textWidth, 24);
+            ? new Rectangle(textLeft, row.Y + Math.Max(0, (row.Height - 30) / 2), textWidth, 30)
+            : new Rectangle(textLeft, row.Y + 6, textWidth, 30);
         var secondaryRect = new Rectangle(textLeft, row.Y + 34, textWidth, 20);
 
-        using var primaryFont = new Font("Segoe UI Semibold", 10f);
-        using var secondaryFont = new Font("Segoe UI", 8.5f);
+        using var primaryFont = new Font("Segoe UI Semibold", 10.5f);
+        using var secondaryFont = new Font("Segoe UI", 9f);
         const TextFormatFlags rowText = TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix |
                                         TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding |
                                         TextFormatFlags.GlyphOverhangPadding;
-        TextRenderer.DrawText(g, primary, primaryFont, primaryRect, UiTheme.TextPrimary, rowText);
+        TextRenderer.DrawText(g, primary, primaryFont, primaryRect, Color.FromArgb(248, 250, 252), rowText);
         if (!string.IsNullOrWhiteSpace(secondary))
         {
-            TextRenderer.DrawText(g, secondary, secondaryFont, secondaryRect, UiTheme.TextMuted, rowText);
+            TextRenderer.DrawText(g, secondary, secondaryFont, secondaryRect, Color.FromArgb(138, 155, 181), rowText);
         }
 
         var used = 0;
@@ -628,7 +760,7 @@ internal sealed class SoftListBox : Control
 
     private static int ChipWidth(string text)
     {
-        using var font = new Font("Segoe UI Semibold", 8f);
+        using var font = new Font("Segoe UI Semibold", 8.5f);
         const TextFormatFlags flags = TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding |
                                       TextFormatFlags.GlyphOverhangPadding;
         return TextRenderer.MeasureText(text, font, Size.Empty, flags).Width + 24 +
@@ -639,15 +771,17 @@ internal sealed class SoftListBox : Control
     {
         if (TryPingMs(chip, out var ms))
             return Color.FromArgb(70, PingQuality(ms));
-        if (chip.Equals("Connected", StringComparison.OrdinalIgnoreCase) ||
-            chip.Equals("Works well", StringComparison.OrdinalIgnoreCase))
+        if (chip.Equals("Connected", StringComparison.OrdinalIgnoreCase))
+            return UiTheme.Accent; // Solid glowing cyan pill matching mockup
+        if (chip.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+            return Color.FromArgb(30, 0, 229, 255);
+        if (chip.Equals("Works well", StringComparison.OrdinalIgnoreCase))
             return Color.FromArgb(45, UiTheme.OkGreen);
         if (chip.Equals("timeout", StringComparison.OrdinalIgnoreCase) ||
             chip.Equals("Often fails", StringComparison.OrdinalIgnoreCase) ||
             chip.Equals("In use", StringComparison.OrdinalIgnoreCase))
             return Color.FromArgb(50, UiTheme.Danger);
-        if (chip.Equals("Auto", StringComparison.OrdinalIgnoreCase) ||
-            chip.Equals("Try it", StringComparison.OrdinalIgnoreCase))
+        if (chip.Equals("Try it", StringComparison.OrdinalIgnoreCase))
             return Color.FromArgb(50, UiTheme.AccentHot);
         return UiTheme.ChipBg;
     }
@@ -656,15 +790,17 @@ internal sealed class SoftListBox : Control
     {
         if (TryPingMs(chip, out var ms))
             return PingQuality(ms);
-        if (chip.Equals("Connected", StringComparison.OrdinalIgnoreCase) ||
-            chip.Equals("Works well", StringComparison.OrdinalIgnoreCase))
+        if (chip.Equals("Connected", StringComparison.OrdinalIgnoreCase))
+            return Color.FromArgb(5, 17, 29); // Dark bold text on cyan pill matching mockup
+        if (chip.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+            return UiTheme.Accent;
+        if (chip.Equals("Works well", StringComparison.OrdinalIgnoreCase))
             return Color.FromArgb(180, 255, 220);
         if (chip.Equals("timeout", StringComparison.OrdinalIgnoreCase) ||
             chip.Equals("Often fails", StringComparison.OrdinalIgnoreCase) ||
             chip.Equals("In use", StringComparison.OrdinalIgnoreCase))
             return Color.FromArgb(255, 190, 195);
-        if (chip.Equals("Auto", StringComparison.OrdinalIgnoreCase) ||
-            chip.Equals("Try it", StringComparison.OrdinalIgnoreCase))
+        if (chip.Equals("Try it", StringComparison.OrdinalIgnoreCase))
             return Color.FromArgb(220, 225, 255);
         return UiTheme.ChipText;
     }
@@ -694,8 +830,12 @@ internal sealed class SoftListBox : Control
         switch (item)
         {
             case OnlineServer s:
-                primary = s.Host;
-                secondary = s.StatusLine;
+                var showName = !string.IsNullOrWhiteSpace(s.Name) && !string.Equals(s.Name, s.Host, StringComparison.OrdinalIgnoreCase);
+                primary = showName ? s.Name : s.Host;
+                var statusParts = new List<string>();
+                if (showName) statusParts.Add(s.Host);
+                if (!string.IsNullOrWhiteSpace(s.StatusLine)) statusParts.Add(s.StatusLine);
+                secondary = string.Join("   ·   ", statusParts);
                 chip = s.StatusChip;
                 extraChip = s.BatteryChip;
                 return;
@@ -810,7 +950,7 @@ internal sealed class SoftTextWell : Panel
 
         var borderColor = _focused
             ? Color.FromArgb(220, UiTheme.Accent)
-            : Color.FromArgb(90, UiTheme.CardBorder);
+            : Color.FromArgb(180, UiTheme.CardBorder);
         using var border = new Pen(borderColor, _focused ? 1.6f : 1.1f);
         g.DrawPath(border, path);
 
@@ -846,7 +986,7 @@ internal sealed class SoftEmptyState : Control
                  ControlStyles.OptimizedDoubleBuffer |
                  ControlStyles.ResizeRedraw |
                  ControlStyles.UserPaint, true);
-        BackColor = UiTheme.InputBg;
+        BackColor = UiTheme.CardFace;
         Dock = DockStyle.Fill;
     }
 
@@ -865,11 +1005,13 @@ internal sealed class SoftEmptyState : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-        using (var bg = new SolidBrush(UiTheme.InputBg))
+        using (var bg = new SolidBrush(Parent?.BackColor ?? BackColor))
             g.FillRectangle(bg, ClientRectangle);
 
-        using var titleFont = new Font("Segoe UI Semibold", 10.5f);
-        using var detailFont = new Font("Segoe UI", 9f);
+        using var titleFont = UiTheme.TryFont(
+            ("Segoe UI", 14f, FontStyle.Bold),
+            ("Segoe UI Semibold", 13.5f, FontStyle.Bold));
+        using var detailFont = new Font("Segoe UI", 10f);
 
         var maxW = Math.Max(40, Width - 40);
         var titleSize = TextRenderer.MeasureText(Title, titleFont, new Size(maxW, 0),
@@ -900,14 +1042,12 @@ internal sealed class SoftEmptyState : Control
         }
 
         var titleTop = showGlyph ? top + glyph + gapGlyph : top;
-        var titleRect = new Rectangle(20, titleTop, maxW, titleSize.Height + 4);
-        var detailRect = new Rectangle(20, titleRect.Bottom + gapTitle, maxW, detailSize.Height + 6);
-        if (detailRect.Bottom > Height - 10)
-            detailRect.Height = Math.Max(18, Height - 10 - detailRect.Top);
+        var titleRect = new Rectangle(20, titleTop, maxW, titleSize.Height + 10);
+        var detailRect = new Rectangle(20, titleTop + titleSize.Height + gapTitle, maxW, detailSize.Height + 14);
 
-        TextRenderer.DrawText(g, Title, titleFont, titleRect, UiTheme.TextPrimary,
+        TextRenderer.DrawText(g, Title, titleFont, titleRect, Color.FromArgb(248, 250, 252),
             TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
-        TextRenderer.DrawText(g, Detail, detailFont, detailRect, UiTheme.TextMuted,
+        TextRenderer.DrawText(g, Detail, detailFont, detailRect, Color.FromArgb(138, 155, 181),
             TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
     }
 
@@ -974,8 +1114,8 @@ internal sealed class SoftLogView : Control
                  ControlStyles.OptimizedDoubleBuffer |
                  ControlStyles.UserPaint |
                  ControlStyles.ResizeRedraw, true);
-        BackColor = Color.FromArgb(10, 16, 36);
-        ForeColor = Color.FromArgb(200, 220, 240);
+        BackColor = UiTheme.InputBg;
+        ForeColor = Color.FromArgb(210, 230, 250);
         Font = new Font("Consolas", 9.25f);
     }
 
@@ -984,6 +1124,18 @@ internal sealed class SoftLogView : Control
         _lines.Clear();
         _scrollY = 0;
         Invalidate();
+    }
+
+    public string GetFullText()
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var (time, msg) in _lines)
+        {
+            var rawTime = time.Trim();
+            var timeStr = rawTime.StartsWith("[") ? rawTime : $"[{rawTime}]";
+            sb.AppendLine($"{timeStr} {msg}");
+        }
+        return sb.ToString();
     }
 
     public void Append(string time, string message)
@@ -1008,18 +1160,28 @@ internal sealed class SoftLogView : Control
         var first = Math.Max(0, _scrollY / LineHeight);
         var last = Math.Min(_lines.Count - 1, (_scrollY + Height) / LineHeight);
         using var timeFont = new Font("Consolas", 9.25f);
-        var timeColor = Color.FromArgb(110, 140, 175);
-        var msgColor = Color.FromArgb(200, 220, 240);
+        var timeColor = Color.FromArgb(100, 130, 160);
         for (var i = first; i <= last; i++)
         {
             var y = i * LineHeight - _scrollY;
-            var timeRect = new Rectangle(8, y, 78, LineHeight);
-            var msgRect = new Rectangle(86, y, Math.Max(20, Width - 94), LineHeight);
+            var rawTime = _lines[i].Time.Trim();
+            var timeStr = rawTime.StartsWith("[") ? rawTime : $"[{rawTime}]";
+            var timeW = TextRenderer.MeasureText(g, timeStr, timeFont).Width;
+            var timeRect = new Rectangle(8, y, timeW + 2, LineHeight);
+            var msgRect = new Rectangle(timeRect.Right + 8, y, Math.Max(20, Width - timeRect.Right - 14), LineHeight);
             const TextFormatFlags logText = TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix |
                                             TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding |
                                             TextFormatFlags.GlyphOverhangPadding;
-            TextRenderer.DrawText(g, _lines[i].Time, timeFont, timeRect, timeColor, logText);
-            TextRenderer.DrawText(g, _lines[i].Message, timeFont, msgRect, msgColor, logText);
+            TextRenderer.DrawText(g, timeStr, timeFont, timeRect, timeColor, logText);
+
+            var msg = _lines[i].Message;
+            var msgColor = (msg.Contains("device", StringComparison.OrdinalIgnoreCase) ||
+                            msg.Contains("attach", StringComparison.OrdinalIgnoreCase) ||
+                            msg.Contains("connect", StringComparison.OrdinalIgnoreCase) ||
+                            msg.Contains("host", StringComparison.OrdinalIgnoreCase))
+                ? Color.FromArgb(0, 229, 255)
+                : Color.FromArgb(226, 232, 240);
+            TextRenderer.DrawText(g, msg, timeFont, msgRect, msgColor, logText);
         }
     }
 

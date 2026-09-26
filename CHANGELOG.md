@@ -13,7 +13,14 @@ To undo one change and keep later work: `git revert <commit>`.
 
 ## Unreleased
 
-_(New work lands here until the next commit.)_
+- Performance: gate per-control-URB logging behind DEBUG and decouple `updateServerUi()` from `MainActivity.logListener` to prevent IPC Binder and network interface queries from causing HID mouse stutter.
+- Discovery: set `SO_REUSEADDR` before binding UDP port 3241 in `DiscoveryBeacon` to prevent `BindException` on quick service restarts.
+- Robustness: add bounds check on `transferBufferLength` (`0..65536`) in `UsbIpSubmitUrb` to prevent negative allocations and uncaught `OutOfMemoryError`.
+- Fast unplug: tombstone recently unplugged USB IDs on Android and Windows to prevent stale device re-appearance in Available; immediately unhide on `ACTION_USB_DEVICE_ATTACHED` and tune Windows tombstone window to 3.5s for snappy re-plugs.
+- Threading: cap UI thread `requestPool.awaitTermination` to 1.5s during unplug teardown to prevent ANR risk.
+- UI Polish (Android): structured device cards with USB icon, bold product name, monospace metadata pill, and color-coded status badges (Ready, Tap to Allow, In use on PC) with tap-to-request permission support; pill-shaped action buttons (24dp radius); polished status banner and headers.
+- UI Polish (Windows): sleek dark crimson Disconnect button palette; softened card border and glow pens for a modern glassmorphic look; glowing cyan 3px left accent indicator on selected list rows; tighter hero banner height.
+- Device Naming Parity: unified `DiscoveryBeacon.friendlyUsbName` companion helper as single source of truth across Android beacon broadcasting, Android UI card rendering, and Windows client DisplayName.
 
 ## 2.0.0 — 2026-09-10
 

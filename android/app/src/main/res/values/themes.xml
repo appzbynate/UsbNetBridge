@@ -16,7 +16,7 @@
     </style>
 
     <style name="Widget.UsbNetBridge.Button" parent="Widget.MaterialComponents.Button">
-        <item name="cornerRadius">12dp</item>
+        <item name="cornerRadius">24dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:minHeight">48dp</item>
@@ -27,7 +27,7 @@
     </style>
 
     <style name="Widget.UsbNetBridge.Button.Outlined" parent="Widget.MaterialComponents.Button.OutlinedButton">
-        <item name="cornerRadius">12dp</item>
+        <item name="cornerRadius">24dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:minHeight">48dp</item>

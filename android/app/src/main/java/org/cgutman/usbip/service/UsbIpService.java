@@ -7,6 +7,8 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -77,6 +79,12 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 	private static volatile int sharedCount = 0;
 	private static volatile String sharingClientName = "";
 	private static volatile String sharingClientIp = "";
+	/** OEM getDeviceList() can still contain a device for a second after DETACHED. */
+	private static final Set<Integer> recentlyUnpluggedIds = ConcurrentHashMap.newKeySet();
+
+	public static boolean isRecentlyUnplugged(int deviceId) {
+		return recentlyUnpluggedIds.contains(deviceId);
+	}
 	
 	private UsbManager usbManager;
 	
@@ -131,6 +139,10 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 					dev = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
 				}
 				if (dev == null) return;
+				final int detachedId = dev.getDeviceId();
+				recentlyUnpluggedIds.add(detachedId);
+				if (discoveryBeacon != null)
+					discoveryBeacon.hideUsbDevice(detachedId);
 				System.err.println("USB DETACHED: " + dev.getDeviceName());
 				String msg = "USB device detached: " +
 						(dev.getProductName() != null ? dev.getProductName() : dev.getDeviceName());
@@ -139,13 +151,15 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 				if (sink != null) {
 					sink.onUsbIpEvent(msg);
 				}
-				// Tear down USB context, close Windows sockets, and push a "gone" event.
-				cleanupDetachedDevice(dev.getDeviceId(), dev, true);
-				if (discoveryBeacon != null) discoveryBeacon.refreshUsbCache();
+				cleanupDetachedDevice(detachedId, dev, true);
 				stopServerIfNoUsbDevicesLeft();
 				// Some OEMs keep the device in getDeviceList() briefly after DETACHED.
-				new android.os.Handler(android.os.Looper.getMainLooper())
-						.postDelayed(() -> stopServerIfNoUsbDevicesLeft(), 750);
+				new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+					recentlyUnpluggedIds.remove(detachedId);
+					if (discoveryBeacon != null)
+						discoveryBeacon.unhideUsbDevice(detachedId);
+					stopServerIfNoUsbDevicesLeft();
+				}, 2500);
 			} else if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
 				UsbDevice dev;
 				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -154,6 +168,10 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 					dev = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
 				}
 				if (dev != null) {
+					recentlyUnpluggedIds.remove(dev.getDeviceId());
+					if (discoveryBeacon != null) {
+						discoveryBeacon.unhideUsbDevice(dev.getDeviceId());
+					}
 					String msg = "USB device attached: " +
 							(dev.getProductName() != null ? dev.getProductName() : dev.getDeviceName());
 					com.usbnetbridge.server.AppLog.INSTANCE.append(msg);
@@ -382,10 +400,19 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 		}
 	}
 
+	private boolean hasLiveUsbDevices() {
+		if (usbManager == null) return false;
+		for (UsbDevice d : usbManager.getDeviceList().values()) {
+			if (!recentlyUnpluggedIds.contains(d.getDeviceId()))
+				return true;
+		}
+		return false;
+	}
+
 	/** Stop sharing when the phone has no USB devices left to export. */
 	private void stopServerIfNoUsbDevicesLeft() {
 		if (!isRunning || usbManager == null) return;
-		if (!usbManager.getDeviceList().isEmpty()) return;
+		if (hasLiveUsbDevices()) return;
 		com.usbnetbridge.server.AppLog.INSTANCE.append(
 				getString(R.string.server_stopped_no_usb));
 		ClientEventSink sink = eventSink;
@@ -710,6 +737,8 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 		ArrayList<UsbDeviceInfo> list = new ArrayList<>();
 		
 		for (UsbDevice dev : usbManager.getDeviceList().values()) {
+			if (recentlyUnpluggedIds.contains(dev.getDeviceId()))
+				continue;
 			AttachedDeviceContext context = connections.get(dev.getDeviceId());
 			UsbDeviceConnection devConn = null;
 			if (context != null) {
@@ -958,14 +987,18 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 								", got=" + (dataBuf == null ? -1 : dataBuf.length) + ")");
 					}
 				}
-				appLog(String.format("CTRL %02x %02x val=%04x idx=%04x len=%d",
-						requestType & 0xFF, request & 0xFF, value & 0xFFFF, index & 0xFFFF, length & 0xFFFF));
+				if (DEBUG) {
+					appLog(String.format("CTRL %02x %02x val=%04x idx=%04x len=%d",
+							requestType & 0xFF, request & 0xFF, value & 0xFFFF, index & 0xFFFF, length & 0xFFFF));
+				}
 				res = XferUtils.doControlTransfer(devConn, requestType, request, value, index,
 						dataBuf, length, timeout);
 			}
 			else {
-				appLog(String.format("CTRL handled internally %02x %02x val=%04x",
-						requestType & 0xFF, request & 0xFF, value & 0xFFFF));
+				if (DEBUG) {
+					appLog(String.format("CTRL handled internally %02x %02x val=%04x",
+							requestType & 0xFF, request & 0xFF, value & 0xFFFF));
+				}
 				res = 0;
 			}
 
@@ -984,7 +1017,9 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 						? Math.min(res, reply.inData != null ? reply.inData.length : 0)
 						: res;
 				reply.status = ProtoDefs.ST_OK;
-				appLog("Control OK actual=" + reply.actualLength + (controlIn ? " IN" : " OUT"));
+				if (DEBUG) {
+					appLog("Control OK actual=" + reply.actualLength + (controlIn ? " IN" : " OUT"));
+				}
 			}
 
 			sendReply(s, reply, reply.status);
@@ -1025,6 +1060,8 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 	}
 	
 	private UsbDevice getDevice(int deviceId) {
+		if (recentlyUnpluggedIds.contains(deviceId))
+			return null;
 		for (UsbDevice dev : usbManager.getDeviceList().values()) {
 			if (dev.getDeviceId() == deviceId) {
 				return dev;
@@ -1232,9 +1269,9 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 		// Close the connection
 		context.devConn.close();
 		
-		// Wait for the queue to die
+		// Wait for the queue to die (capped so UI thread never freezes on slow workers)
 		try {
-			context.requestPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+			context.requestPool.awaitTermination(1500, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {}
 
 		updateNotification();

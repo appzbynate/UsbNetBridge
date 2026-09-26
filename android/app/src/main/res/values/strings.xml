@@ -10,9 +10,9 @@
     <string name="status_stopped">Stopped</string>
     <string name="status_waiting">Running — waiting for PC</string>
     <string name="status_sharing">Sharing %1$d device(s)</string>
-    <string name="status_on_pc">On %1$s</string>
+    <string name="status_on_pc">Active • Sharing to %1$s</string>
     <string name="device_on_pc"> → on %1$s</string>
-    <string name="endpoint_idle">Start to show this device’s IP</string>
+    <string name="endpoint_idle">Start to show device IP</string>
     <string name="endpoint_no_ip">No network IP — join Wi‑Fi, hotspot, or VPN</string>
     <string name="hint_screen">You can turn the screen off while sharing. On the PC, tap Find.</string>
     <string name="hint_pick_ip">Type the first address on the PC (same network). Use the VPN address only if you connected through VPN.</string>
@@ -20,7 +20,7 @@
     <string name="hint_permission">If asked for USB permission, tap Allow.</string>
     <string name="usb_attached_toast">USB plugged in — tap Start to share</string>
     <string name="usb_permission_hint">Allow USB access when prompted</string>
-    <string name="devices_empty">No USB devices yet. Plug one into this device.</string>
+    <string name="devices_empty">No USB devices detected. Connect a device to begin sharing.</string>
     <string name="need_usb_to_start">Plug in a USB device before starting the server.</string>
     <string name="server_stopped_no_usb">No USB devices left — server stopped.</string>
     <string name="log_title">Activity</string>
@@ -29,6 +29,14 @@
     <string name="start">Start</string>
     <string name="stop">Stop</string>
     <string name="refresh">Refresh</string>
-    <string name="section_connect">1. Share to PC</string>
-    <string name="section_devices">2. USB devices</string>
+    <string name="section_connect">Host Connection</string>
+    <string name="section_devices">USB Devices</string>
+    <string name="badge_ready">Ready</string>
+    <string name="badge_need_perm">Tap to Allow</string>
+    <string name="badge_sharing">In use on %1$s</string>
+    <string name="status_stopped_sub">Server idle • Plug in USB and tap Start</string>
+    <string name="status_waiting_sub">Broadcasting on LAN • Waiting for PC to connect</string>
+    <string name="status_sharing_sub">Streaming USB data to %1$s</string>
+    <string name="empty_usb_title">No USB Devices Detected</string>
+    <string name="empty_usb_detail">Plug a USB device into this phone using an OTG adapter or cable.</string>
 </resources>

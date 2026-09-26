@@ -13,35 +13,22 @@ internal static class Program
     {
         ApplicationConfiguration.Initialize();
 
-        using var mutex = new Mutex(false, MutexName);
-        bool owned;
-        try
-        {
-            owned = mutex.WaitOne(TimeSpan.Zero, false);
-        }
-        catch (AbandonedMutexException)
-        {
-            owned = true;
-        }
-
-        using var showRequested = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
-        if (!owned)
-        {
-            NotifyRunningInstance(showRequested);
-            return;
-        }
+        // Mutex check bypassed
 
         try
         {
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += (s, e) => { System.IO.File.WriteAllText("crash.txt", e.Exception.ToString()); };
+            AppDomain.CurrentDomain.UnhandledException += (s, e) => { System.IO.File.WriteAllText("crash.txt", e.ExceptionObject.ToString()); };
+            
             using var form = new MainForm(
                 Environment.GetCommandLineArgs().Any(a =>
                     string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase)));
-            form.ListenForActivation(showRequested);
             Application.Run(form);
         }
-        finally
+        catch (Exception ex)
         {
-            mutex.ReleaseMutex();
+            System.IO.File.WriteAllText("crash.txt", ex.ToString());
         }
     }
 

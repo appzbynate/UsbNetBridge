@@ -60,7 +60,7 @@ JNIEXPORT jint JNICALL
 Java_org_cgutman_usbip_jni_UsbLib_doBulkTransfer(
         JNIEnv *env, jclass clazz, jint fd, jint endpoint, jbyteArray data, jint timeout)
 {
-    jbyte* dataPtr = data ? (jbyte*)(*env)->GetPrimitiveArrayCritical(env, data, NULL) : NULL;
+    jbyte* dataPtr = data ? (*env)->GetByteArrayElements(env, data, NULL) : NULL;
     jsize dataLen = data ? (*env)->GetArrayLength(env, data) : 0;
 
     struct usbdevfs_bulktransfer xfer = {
@@ -76,8 +76,8 @@ Java_org_cgutman_usbip_jni_UsbLib_doBulkTransfer(
 
     // If this is an OUT or a failed IN, use JNI_ABORT to avoid a useless memcpy().
     if (dataPtr) {
-        (*env)->ReleasePrimitiveArrayCritical(env, data, dataPtr,
-                                              ((endpoint & 0x80) && (res > 0)) ? 0 : JNI_ABORT);
+        (*env)->ReleaseByteArrayElements(env, data, dataPtr,
+                                         ((endpoint & 0x80) && (res > 0)) ? 0 : JNI_ABORT);
     }
 
     return res;
@@ -88,7 +88,7 @@ Java_org_cgutman_usbip_jni_UsbLib_doControlTransfer(
         JNIEnv *env, jclass clazz, jint fd, jbyte requestType, jbyte request, jshort value,
         jshort index, jbyteArray data, jint length, jint timeout)
 {
-    jbyte* dataPtr = data ? (jbyte*)(*env)->GetPrimitiveArrayCritical(env, data, NULL) : NULL;
+    jbyte* dataPtr = data ? (*env)->GetByteArrayElements(env, data, NULL) : NULL;
 
     struct usbdevfs_ctrltransfer xfer = {
             .bRequestType = requestType,
@@ -106,8 +106,8 @@ Java_org_cgutman_usbip_jni_UsbLib_doControlTransfer(
 
     // If this is an OUT or a failed IN, use JNI_ABORT to avoid a useless memcpy().
     if (dataPtr) {
-        (*env)->ReleasePrimitiveArrayCritical(env, data, dataPtr,
-                                              ((requestType & 0x80) && (res > 0)) ? 0 : JNI_ABORT);
+        (*env)->ReleaseByteArrayElements(env, data, dataPtr,
+                                         ((requestType & 0x80) && (res > 0)) ? 0 : JNI_ABORT);
     }
 
     return res;

@@ -17,6 +17,9 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.view.LayoutInflater
+import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -37,9 +40,6 @@ class MainActivity : AppCompatActivity() {
     private val logListener: (String) -> Unit = { line ->
         runOnUiThread {
             binding.lastEventText.text = line
-            binding.logView.append(line + "\n")
-            binding.logView.setSelection(binding.logView.text?.length ?: 0)
-            updateServerUi()
         }
     }
 
@@ -63,11 +63,14 @@ class MainActivity : AppCompatActivity() {
         binding.stopButton.setOnClickListener { stopUsbIpServer() }
         binding.refreshButton.setOnClickListener { refreshDevices() }
         binding.copyEndpointButton.setOnClickListener { copyEndpointToClipboard() }
-        binding.copyLogButton.setOnClickListener { copyLogToClipboard() }
+        binding.showLogsButton.setOnClickListener { showLogsDialog() }
 
         ensureNotificationPermission()
         UsbIpService.setEventSink {
-            runOnUiThread { updateServerUi() }
+            runOnUiThread {
+                updateServerUi()
+                refreshDevices()
+            }
         }
 
         AppLog.addListener(logListener)
@@ -150,8 +153,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun reloadLogFromBuffer() {
-        binding.logView.setText(AppLog.snapshot())
-        binding.logView.setSelection(binding.logView.text?.length ?: 0)
         binding.lastEventText.text = AppLog.lastLine.ifBlank { "—" }
     }
 
@@ -187,45 +188,67 @@ class MainActivity : AppCompatActivity() {
 
     private fun hasPluggedUsbDevices(): Boolean {
         val usbManager = getSystemService(USB_SERVICE) as UsbManager
-        return usbManager.deviceList.isNotEmpty()
+        return usbManager.deviceList.values.any { !UsbIpService.isRecentlyUnplugged(it.deviceId) }
     }
 
     private fun refreshDevices() {
         val usbManager = getSystemService(USB_SERVICE) as UsbManager
-        val devices = usbManager.deviceList.values.toList().sortedBy { it.deviceName }
+        val devices = usbManager.deviceList.values
+            .filter { !UsbIpService.isRecentlyUnplugged(it.deviceId) }
+            .sortedBy { it.deviceName }
         if (devices.isEmpty()) {
-            binding.deviceListText.text = getString(R.string.devices_empty)
+            binding.deviceEmptyLayout.visibility = View.VISIBLE
+            binding.deviceListText.text = getString(R.string.empty_usb_detail)
+            binding.devicesContainer.visibility = View.GONE
+            binding.devicesContainer.removeAllViews()
             updateServerUi()
             return
         }
-        binding.deviceListText.text = devices.joinToString("\n\n") { d ->
-            val product = d.productName?.trim().orEmpty()
-            val manufacturer = d.manufacturerName?.trim().orEmpty()
-            val name = when {
-                product.isNotEmpty() && manufacturer.isNotEmpty() &&
-                    !product.contains(manufacturer, ignoreCase = true) -> "$manufacturer $product"
-                product.isNotEmpty() -> product
-                manufacturer.isNotEmpty() -> manufacturer
-                else -> "USB device"
-            }
+
+        binding.deviceEmptyLayout.visibility = View.GONE
+        binding.devicesContainer.visibility = View.VISIBLE
+        binding.devicesContainer.removeAllViews()
+
+        val inflater = LayoutInflater.from(this)
+        val onPc = UsbIpService.getSharingClientName()
+        val isSharing = UsbIpService.isRunning && UsbIpService.getSharedDeviceCount() > 0 && onPc.isNotBlank()
+
+        for (d in devices) {
+            val itemView = inflater.inflate(R.layout.item_usb_device, binding.devicesContainer, false)
+            val name = DiscoveryBeacon.friendlyUsbName(d)
             val busnum = d.deviceId / 1000
             val devnum = d.deviceId % 1000
             val busid = "$busnum-$devnum"
-            val perm = if (usbManager.hasPermission(d)) "OK" else "ask on attach"
-            val onPc = UsbIpService.getSharingClientName()
-            val using = if (UsbIpService.isRunning && UsbIpService.getSharedDeviceCount() > 0 && onPc.isNotBlank())
-                getString(R.string.device_on_pc, onPc)
-            else ""
-            String.format(
-                Locale.US,
-                "%s\n(%04x:%04x)  [%s]  perm=%s%s",
-                name,
-                d.vendorId,
-                d.productId,
-                busid,
-                perm,
-                using
-            )
+            val hasPerm = usbManager.hasPermission(d)
+
+            val nameView = itemView.findViewById<TextView>(R.id.deviceName)
+            val detailsView = itemView.findViewById<TextView>(R.id.deviceDetails)
+            val badgeView = itemView.findViewById<TextView>(R.id.deviceStatusBadge)
+
+            nameView.text = name
+            detailsView.text = String.format(Locale.US, "%04x:%04x  •  Bus [%s]", d.vendorId, d.productId, busid)
+
+            when {
+                isSharing -> {
+                    badgeView.text = getString(R.string.badge_sharing, onPc)
+                    badgeView.setBackgroundResource(R.drawable.bg_badge_info)
+                    badgeView.setTextColor(ContextCompat.getColor(this, R.color.accent))
+                }
+                hasPerm -> {
+                    badgeView.text = getString(R.string.badge_ready)
+                    badgeView.setBackgroundResource(R.drawable.bg_badge_ok)
+                    badgeView.setTextColor(ContextCompat.getColor(this, R.color.ok))
+                }
+                else -> {
+                    badgeView.text = getString(R.string.badge_need_perm)
+                    badgeView.setBackgroundResource(R.drawable.bg_badge_warn)
+                    badgeView.setTextColor(ContextCompat.getColor(this, R.color.warning))
+                    itemView.setOnClickListener {
+                        maybeRequestUsbPermission(d)
+                    }
+                }
+            }
+            binding.devicesContainer.addView(itemView)
         }
         updateServerUi()
     }
@@ -239,13 +262,14 @@ class MainActivity : AppCompatActivity() {
 
         val shared = if (running) UsbIpService.getSharedDeviceCount() else 0
         val pcName = UsbIpService.getSharingClientName()
-        val (label, colorRes) = when {
-            !running -> getString(R.string.status_stopped) to R.color.status_stopped
-            shared > 0 && pcName.isNotBlank() -> getString(R.string.status_on_pc, pcName) to R.color.status_sharing
-            shared > 0 -> getString(R.string.status_sharing, shared) to R.color.status_sharing
-            else -> getString(R.string.status_waiting) to R.color.status_waiting
+        val (label, sub, colorRes) = when {
+            !running -> Triple(getString(R.string.status_stopped), getString(R.string.status_stopped_sub), R.color.status_stopped)
+            shared > 0 && pcName.isNotBlank() -> Triple(getString(R.string.status_on_pc, pcName), getString(R.string.status_sharing_sub, pcName), R.color.status_sharing)
+            shared > 0 -> Triple(getString(R.string.status_sharing, shared), getString(R.string.status_sharing_sub, "PC"), R.color.status_sharing)
+            else -> Triple(getString(R.string.status_waiting), getString(R.string.status_waiting_sub), R.color.status_waiting)
         }
         binding.statusText.text = label
+        binding.statusSubtitle.text = sub
         setStatusDot(ContextCompat.getColor(this, colorRes))
         updateEndpointUi(running)
     }
@@ -304,10 +328,29 @@ class MainActivity : AppCompatActivity() {
         toast("Copied $value")
     }
 
-    private fun copyLogToClipboard() {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("UsbNetBridge log", AppLog.snapshot()))
-        toast("Log copied")
+    private fun showLogsDialog() {
+        val builder = android.app.AlertDialog.Builder(this)
+        val ctx = builder.context
+        val scrollView = android.widget.ScrollView(ctx)
+        val textView = android.widget.TextView(ctx).apply {
+            text = AppLog.snapshot()
+            textSize = 12f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setTextColor(android.graphics.Color.parseColor("#111827"))
+            setPadding(32, 32, 32, 32)
+        }
+        scrollView.addView(textView)
+
+        builder
+            .setTitle("Activity Logs")
+            .setView(scrollView)
+            .setPositiveButton("COPY") { _, _ ->
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("UsbNetBridge log", AppLog.snapshot()))
+                toast("Log copied")
+            }
+            .setNegativeButton("CLOSE", null)
+            .show()
     }
 
 

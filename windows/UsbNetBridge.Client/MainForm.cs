@@ -18,11 +18,11 @@ public sealed class MainForm : Form
     private const int ActiveVisibleLines = 2;
     // Section title + card chrome + list rows + Disconnect row (shown when a device is attached).
     private static int ActiveSectionHeight =>
-        44 + 24 + 8 + (ActiveVisibleLines * ActiveItemHeight) + 56;
-    private const int InventoryTopMinHeight = 156;
-    private const int LogSectionMinHeight = 124;
-    private const int HeaderSectionHeight = 88;
-    private const int ConnectSectionEstimate = 118;
+        44 + 24 + 8 + (ActiveVisibleLines * ActiveItemHeight) + 96 + 20;
+    private const int InventoryTopMinHeight = 280;
+    private const int LogSectionMinHeight = 140;
+    private const int HeaderSectionHeight = 44;
+    private const int ConnectSectionEstimate = 100;
 
     // Icon-inspired palette (cyan / indigo / soft night blue)
     private static readonly Color BgDeep = UiTheme.BgDeep;
@@ -99,9 +99,11 @@ public sealed class MainForm : Form
     private bool _detachStaleBusy;
     private DateTime _suppressGoneUntilUtc = DateTime.MinValue;
     private DateTime _offlineHandledUntilUtc = DateTime.MinValue;
+    private readonly Dictionary<string, DateTime> _goneUntil = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _offlineGate = new();
     private bool _forceExit;
     private bool _exiting;
+    private bool _mockupMode;
     private bool _closePromptOpen;
     private bool _alwaysMinimizeToTray;
     private ToolStripMenuItem? _alwaysTrayMenuItem;
@@ -115,7 +117,52 @@ public sealed class MainForm : Form
     private Bitmap? _windowBgCache;
     private Size _windowBgCacheSize;
     private Control? _connectCard;
+    private Form? _logForm;
 
+    private void ShowLogWindow()
+    {
+        if (_logForm != null && !_logForm.IsDisposed)
+        {
+            if (_logForm.WindowState == FormWindowState.Minimized)
+                _logForm.WindowState = FormWindowState.Normal;
+            _logForm.BringToFront();
+            return;
+        }
+
+        _logForm = new Form
+        {
+            Text = "Activity Logs - UsbNetBridge",
+            Size = new Size(600, 400),
+            StartPosition = FormStartPosition.CenterParent,
+            BackColor = UiTheme.BgDeep,
+            ForeColor = UiTheme.TextPrimary,
+            ShowIcon = false
+        };
+        
+        var logBoxWrapper = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
+        _logBox.Dock = DockStyle.Fill;
+        logBoxWrapper.Controls.Add(_logBox);
+        _logForm.Controls.Add(logBoxWrapper);
+
+        var bottomPanel = new Panel { Dock = DockStyle.Bottom, Height = 60, Padding = new Padding(12) };
+        var copyBtn = new Soft3dButton { Text = "Copy Logs", Size = new Size(120, 36), Dock = DockStyle.Right };
+        StylePrimaryButton(copyBtn, "Copy Logs");
+        copyBtn.Click += (_, _) => {
+            var text = _logBox.GetFullText();
+            if (!string.IsNullOrWhiteSpace(text))
+                Clipboard.SetText(text);
+        };
+        bottomPanel.Controls.Add(copyBtn);
+        
+        var clearBtn = new Soft3dButton { Text = "Clear", Size = new Size(80, 36), Dock = DockStyle.Left };
+        StyleSecondaryButton(clearBtn, "Clear");
+        clearBtn.Click += (_, _) => _logBox.Clear();
+        bottomPanel.Controls.Add(clearBtn);
+
+        _logForm.Controls.Add(bottomPanel);
+        _logForm.FormClosed += (_, _) => _logForm = null;
+        _logForm.Show(this);
+    }
     public MainForm(bool startInTray = false)
     {
         _startInTray = startInTray;
@@ -145,6 +192,10 @@ public sealed class MainForm : Form
 
         StyleControls();
         BuildLayout();
+        UpdateListEmptyVisible(_serverList, _serversEmpty);
+        UpdateDevicesEmptyVisible();
+        UpdateListEmptyVisible(_attachedList, _attachedEmpty);
+        UpdateDisconnectUi();
         ApplyMinWindowSize();
         StartSearchPulse();
         StartLatencyPing();
@@ -315,6 +366,16 @@ public sealed class MainForm : Form
         // Win11 DWM resize animation composites child HWNDs mid-layout. Turn it off.
         var disable = 1;
         _ = DwmSetWindowAttribute(Handle, 3 /* DWMWA_TRANSITIONS_FORCEDISABLED */, ref disable, sizeof(int));
+
+        // Enable Windows 10/11 immersive dark mode title bar matching the app theme
+        var darkMode = 1;
+        _ = DwmSetWindowAttribute(Handle, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, ref darkMode, sizeof(int));
+        _ = DwmSetWindowAttribute(Handle, 19 /* DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 */, ref darkMode, sizeof(int));
+        var captionColor = 0x001D0F0A; // COLORREF: 0x00BBGGRR for #0A0F1D
+        _ = DwmSetWindowAttribute(Handle, 35 /* DWMWA_CAPTION_COLOR */, ref captionColor, sizeof(int));
+        var textColor = 0x00FFFFFF; // Crisp white title text
+        _ = DwmSetWindowAttribute(Handle, 36 /* DWMWA_TEXT_COLOR */, ref textColor, sizeof(int));
+
         var mods = ModControl | ModAlt | ModNoRepeat;
         if (RegisterHotKey(Handle, HotkeyDetachAll, mods, (uint)Keys.D) &&
             RegisterHotKey(Handle, HotkeyReconnect, mods, (uint)Keys.A))
@@ -344,13 +405,12 @@ public sealed class MainForm : Form
     private Size ComputeMinClientSize()
     {
         var s = UiScale;
-        var connectH = ConnectSectionEstimate;
-        const int rootPad = 28;
-        const int sectionGaps = 6 + 8 + 12 + 4;
-        var h = rootPad + HeaderSectionHeight + connectH + InventoryTopMinHeight
-                + ActiveSectionHeight + LogSectionMinHeight + sectionGaps;
+        // Fixed-chrome layout: root fills the window exactly. Sections divide space
+        // proportionally via SizeType.Percent. No scrollbar needed.
+        // 680 unscaled → 1020px at 150% DPI, fits comfortably on 1080p.
+        var h = 680;
         return new Size(
-            (int)Math.Ceiling(800 * s),
+            (int)Math.Ceiling(490 * s),
             (int)Math.Ceiling(h * s));
     }
 
@@ -434,22 +494,24 @@ public sealed class MainForm : Form
         StyleSoftList(_deviceList);
         StyleSoftList(_attachedList);
 
-        _serversEmpty.SetCopy("No USB host nearby", "Start UsbNetBridge on the USB host");
+        _serversEmpty.Glyph = SoftEmptyGlyph.None;
+        _serversEmpty.SetCopy("No USB hosts found", "Start UsbNetBridge on your phone or PC");
+        _devicesEmpty.Glyph = SoftEmptyGlyph.None;
         _devicesEmpty.SetCopy("No devices yet", "Plug in a USB device, then Refresh");
-        _attachedEmpty.Glyph = SoftEmptyGlyph.Usb;
-        _attachedEmpty.SetCopy("Nothing active", "Double-click a device above to use it");
+        _attachedEmpty.Glyph = SoftEmptyGlyph.None;
+        _attachedEmpty.SetCopy("No active devices", "Double-click a device above to connect");
 
-        StyleDangerButton(_disconnectBtn, "Disconnect");
+        StyleSecondaryButton(_disconnectBtn, "Disconnect");
         _disconnectBtn.Enabled = false;
-        _disconnectBtn.MinimumSize = new Size(120, ButtonHeight);
+        _disconnectBtn.MinimumSize = new Size(130, ButtonHeight);
         _disconnectBtn.Margin = new Padding(0, 8, 14, 0);
         StyleDangerButton(_disconnectAllBtn, "Disconnect all");
         _disconnectAllBtn.Enabled = false;
-        _disconnectAllBtn.MinimumSize = new Size(140, ButtonHeight);
+        _disconnectAllBtn.MinimumSize = new Size(150, ButtonHeight);
         _disconnectAllBtn.Margin = new Padding(0, 8, 0, 0);
         _disconnectHint.Text = "Or double-click a row";
         _disconnectHint.AutoSize = true;
-        _disconnectHint.ForeColor = TextMuted;
+        _disconnectHint.ForeColor = Color.FromArgb(148, 163, 184);
         _disconnectHint.Margin = new Padding(16, 14, 0, 0);
         _disconnectHint.BackColor = Color.Transparent;
 
@@ -465,10 +527,10 @@ public sealed class MainForm : Form
         _logBox.MinimumSize = new Size(0, 140);
     }
 
-    private static void StyleSoftList(SoftListBox list)
+    private void StyleSoftList(SoftListBox list)
     {
         list.Dock = DockStyle.Fill;
-        list.ItemHeight = UiTheme.ListItemHeight;
+        list.ItemHeight = (int)(UiTheme.ListItemHeight * UiScale);
     }
 
     private void BuildLayout()
@@ -477,60 +539,35 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4,
+            RowCount = 3,
             Padding = new Padding(14),
             BackColor = Color.Transparent,
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, HeaderSectionHeight)); // header
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, HeaderSectionHeight * UiScale)); // header
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // connect
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));   // inventory (takes remaining)
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, LogSectionMinHeight)); // log (fixed strip)
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));   // inventory (fills remaining)
 
-        // Brand header — soft veil keeps the logo readable over the circuit background.
         var header = new DoubleBufferedPanel
         {
             Dock = DockStyle.Fill,
             BackColor = Color.Transparent,
-            Margin = new Padding(0, 0, 0, 6),
-            Padding = new Padding(4, 2, 4, 4),
         };
-        header.Paint += (_, e) =>
-        {
-            var g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            var r = header.ClientRectangle;
-            // Dark wash + fade so title/logo stay clear; circuit remains in the gutters.
-            using (var veil = new LinearGradientBrush(r,
-                       Color.FromArgb(225, BgDeep),
-                       Color.FromArgb(155, BgDeep), 90f))
-                g.FillRectangle(veil, r);
-            var y = r.Height - 2;
-            using var pen = new Pen(Color.FromArgb(70, Accent), 1f);
-            g.DrawLine(pen, 24, y, Math.Max(24, r.Width - 24), y);
-        };
-        var headerLayout = new BufferedTableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 2,
-            BackColor = Color.Transparent,
-        };
-        headerLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        headerLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        var logsBtn = new Soft3dButton { Text = "Logs", Size = new Size(80, 32) };
+        StyleSecondaryButton(logsBtn, "Logs");
+        logsBtn.Click += (_, _) => ShowLogWindow();
+        
+        var logsWrapper = new Panel { Dock = DockStyle.Right, Width = 80 + 8 };
+        logsBtn.Location = new Point(0, (HeaderSectionHeight - logsBtn.Height) / 2);
+        logsWrapper.Controls.Add(logsBtn);
+        header.Controls.Add(logsWrapper);
 
         var logo = new BufferedLogo
         {
-            Dock = DockStyle.Fill,
-            Image = LoadTitleLogo(),
+            Dock = DockStyle.Fill
         };
-        var subtitle = new HeroTagline
-        {
-            Dock = DockStyle.Fill,
-            Tagline = "Use a USB device from a USB host on this PC  ·  over your network",
-        };
-        headerLayout.Controls.Add(logo, 0, 0);
-        headerLayout.Controls.Add(subtitle, 0, 1);
-        header.Controls.Add(headerLayout);
+        header.Controls.Add(logo);
+
         root.Controls.Add(header, 0, 0);
 
         // Auto-sized connect card so titles/buttons never clip / overlap
@@ -542,7 +579,7 @@ public sealed class MainForm : Form
         connect.Margin = new Padding(0, 0, 0, 8);
 
         _connectHero.Dock = DockStyle.Top;
-        _connectHero.Height = 108;
+        _connectHero.AutoSize = true;
         _connectHero.Margin = new Padding(0);
         connect.Controls.Add(_connectHero);
         UiTheme.BindRoundRegion(_connectHero, 16);
@@ -559,23 +596,23 @@ public sealed class MainForm : Form
             RowCount = 2,
             BackColor = Color.Transparent,
             Margin = new Padding(0, 4, 0, 6),
-            MinimumSize = new Size(0, InventoryTopMinHeight + ActiveSectionHeight),
         };
-        mid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        mid.RowStyles.Add(new RowStyle(SizeType.Absolute, ActiveSectionHeight));
+        mid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        mid.RowStyles.Add(new RowStyle(SizeType.Percent, 60));  // topMid (hosts + devices)
+        mid.RowStyles.Add(new RowStyle(SizeType.Percent, 40));  // active
 
         var topMid = new BufferedTableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 1,
+            ColumnCount = 1,
+            RowCount = 2,
             BackColor = Color.Transparent,
             Margin = new Padding(0),
             Padding = new Padding(0),
-            MinimumSize = new Size(0, InventoryTopMinHeight),
         };
-        topMid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
-        topMid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
+        topMid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        topMid.RowStyles.Add(new RowStyle(SizeType.Percent, 50));  // servers card
+        topMid.RowStyles.Add(new RowStyle(SizeType.Percent, 50));  // devices card
 
         _manualRow = new BufferedFlowLayoutPanel
         {
@@ -647,11 +684,11 @@ public sealed class MainForm : Form
         serverFooter.Controls.Add(_savedRow, 0, 2);
 
         var serversCard = MakeSectionCard("USB hosts", _serverList, _serversEmpty, footer: serverFooter);
-        serversCard.Margin = new Padding(0, 0, 10, 0);
+        serversCard.Margin = new Padding(0, 0, 0, 10);
         var devicesCard = MakeSectionCard("Devices", _deviceList, _devicesEmpty, headerTrailing: _refreshBtn);
-        devicesCard.Margin = new Padding(10, 0, 0, 0);
+        devicesCard.Margin = new Padding(0, 10, 0, 0);
         topMid.Controls.Add(serversCard, 0, 0);
-        topMid.Controls.Add(devicesCard, 1, 0);
+        topMid.Controls.Add(devicesCard, 0, 1);
 
         var attachedBody = new BufferedTableLayoutPanel
         {
@@ -660,10 +697,12 @@ public sealed class MainForm : Form
             RowCount = 2,
             BackColor = Color.Transparent,
             Margin = new Padding(0),
+            Padding = new Padding(0)
         };
         _attachedBody = attachedBody;
-        attachedBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        attachedBody.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
+        attachedBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        attachedBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // list fills remaining
+        attachedBody.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));  // disconnect row (dynamic)
 
         var attachedHost = new DoubleBufferedPanel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Padding = new Padding(2) };
         _attachedList.Dock = DockStyle.Fill;
@@ -672,9 +711,8 @@ public sealed class MainForm : Form
         attachedHost.Controls.Add(_attachedEmpty);
         _attachedEmpty.BringToFront();
 
-        _disconnectRow.Dock = DockStyle.Fill;
         _disconnectRow.FlowDirection = FlowDirection.LeftToRight;
-        _disconnectRow.WrapContents = false;
+        _disconnectRow.WrapContents = true;
         _disconnectRow.BackColor = Color.Transparent;
         _disconnectRow.Padding = new Padding(0, 8, 0, 2);
         _disconnectRow.Visible = false;
@@ -692,17 +730,8 @@ public sealed class MainForm : Form
         mid.Controls.Add(attachedCard, 0, 1);
         root.Controls.Add(mid, 0, 2);
 
-        var logHost = new DoubleBufferedPanel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(10, 16, 36),
-            Padding = new Padding(8, 6, 6, 6),
-        };
         _logBox.Dock = DockStyle.Fill;
-        logHost.Controls.Add(_logBox);
-        var logCard = MakeSectionCard("Activity", logHost, null, headerTrailing: _clearLogBtn);
-        logCard.Margin = new Padding(0, 4, 0, 0);
-        root.Controls.Add(logCard, 0, 3);
+        // removed logCard
 
         Controls.Add(root);
     }
@@ -710,7 +739,7 @@ public sealed class MainForm : Form
     private Panel MakeSectionCard(string title, Control body, Control? overlay, Control? headerTrailing = null, Control? footer = null)
     {
         var card = MakeCard();
-        card.Padding = new Padding(12, 10, 12, 10);
+        card.Padding = new Padding(14, 12, 14, 14);
         card.Margin = new Padding(0);
 
         var layout = new BufferedTableLayoutPanel
@@ -720,10 +749,11 @@ public sealed class MainForm : Form
             RowCount = footer == null ? 2 : 3,
             BackColor = CardFace,
         };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36 * UiScale)); // header
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));           // body fills remaining
         if (footer != null)
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));           // footer
 
         var headerRow = new BufferedTableLayoutPanel
         {
@@ -746,27 +776,31 @@ public sealed class MainForm : Form
         }
         layout.Controls.Add(headerRow, 0, 0);
 
+        bool isActivity = string.Equals(title, "Activity", StringComparison.OrdinalIgnoreCase);
         var bodyHost = new DoubleBufferedPanel
         {
             Dock = DockStyle.Fill,
-            BackColor = CardFace,
-            Padding = new Padding(8, 8, 8, 8),
+            BackColor = isActivity ? InputBg : CardFace,
+            Padding = isActivity ? new Padding(8, 8, 8, 8) : new Padding(0),
         };
-        UiTheme.BindRoundRegion(bodyHost, WellRadius);
-        bodyHost.Paint += (_, e) =>
+        if (isActivity)
         {
-            var g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            var r = bodyHost.ClientRectangle;
-            r.Width -= 1;
-            r.Height -= 1;
-            if (r.Width < 4 || r.Height < 4) return;
-            using var path = CreateRoundRect(r, WellRadius);
-            using var fill = new SolidBrush(InputBg);
-            using var border = new Pen(Color.FromArgb(55, CardBorder), 1);
-            g.FillPath(fill, path);
-            g.DrawPath(border, path);
-        };
+            UiTheme.BindRoundRegion(bodyHost, 12);
+            bodyHost.Paint += (_, e) =>
+            {
+                var g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                var r = bodyHost.ClientRectangle;
+                r.Width -= 1;
+                r.Height -= 1;
+                if (r.Width < 4 || r.Height < 4) return;
+                using var path = CreateRoundRect(r, 12);
+                using var fill = new SolidBrush(InputBg);
+                using var border = new Pen(Color.FromArgb(150, CardBorder), 1);
+                g.FillPath(fill, path);
+                g.DrawPath(border, path);
+            };
+        }
         body.Dock = DockStyle.Fill;
         bodyHost.Controls.Add(body);
         if (overlay != null)
@@ -800,19 +834,12 @@ public sealed class MainForm : Form
             r.Height -= 1;
             if (r.Width < 8 || r.Height < 8) return;
 
-            using var path = CreateRoundRect(r, CornerRadius);
-            using (var brush = new LinearGradientBrush(r, CardFaceLite, CardFace, 90f))
+            using var path = CreateRoundRect(r, 16);
+            using (var brush = new LinearGradientBrush(r, Color.FromArgb(18, 27, 44), Color.FromArgb(13, 20, 34), 90f))
                 g.FillPath(brush, path);
 
-            using var border = new Pen(Color.FromArgb(120, CardBorder), 1.25f);
-            using var glow = new Pen(Color.FromArgb(55, Accent), 1.5f);
+            using var border = new Pen(CardBorder, 1.0f);
             g.DrawPath(border, path);
-            var inner = Rectangle.Inflate(r, -1, -1);
-            if (inner.Width > 4 && inner.Height > 4)
-            {
-                using var innerPath = CreateRoundRect(inner, Math.Max(1, CornerRadius - 1));
-                g.DrawPath(glow, innerPath);
-            }
         };
         return card;
     }
@@ -1008,83 +1035,57 @@ public sealed class MainForm : Form
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-            var radius = 12;
-            var shadowRect = new Rectangle(2, 4, Math.Max(1, Width - 4), Math.Max(1, Height - 4));
-            var bodyRect = _pressed
-                ? new Rectangle(2, 3, Math.Max(1, Width - 4), Math.Max(1, Height - 6))
-                : new Rectangle(1, 1, Math.Max(1, Width - 3), Math.Max(1, Height - 5));
+            var radius = 10;
+            var bodyRect = new Rectangle(1, 1, Math.Max(1, Width - 3), Math.Max(1, Height - 3));
 
             if (bodyRect.Width < 8 || bodyRect.Height < 8)
                 return;
-
-            if (Enabled && !_pressed)
-            {
-                using var shadowPath = CreateRoundRect(shadowRect, radius);
-                using var shadow = new PathGradientBrush(shadowPath)
-                {
-                    CenterColor = Color.FromArgb(70, 0, 0, 0),
-                    SurroundColors = new[] { Color.FromArgb(0, 0, 0, 0) },
-                    FocusScales = new PointF(0.72f, 0.55f),
-                };
-                g.FillPath(shadow, shadowPath);
-            }
 
             GetPalette(out var top, out var bottom, out var rim, out var text);
 
             if (!Enabled)
             {
-                top = Color.FromArgb(90, top.R, top.G, top.B);
-                bottom = Color.FromArgb(90, bottom.R, bottom.G, bottom.B);
-                rim = Color.FromArgb(60, rim);
-                text = Color.FromArgb(140, 175, 200);
+                top = Color.FromArgb(14, 20, 30);
+                bottom = Color.FromArgb(11, 16, 24);
+                rim = Color.FromArgb(30, 42, 58);
+                text = Color.FromArgb(80, 100, 130);
             }
             else if (_pressed)
             {
-                top = Darken(top, 0.14f);
-                bottom = Darken(bottom, 0.10f);
+                top = Darken(top, 0.15f);
+                bottom = Darken(bottom, 0.15f);
             }
             else if (_hover)
             {
-                top = Lighten(top, 0.10f);
-                bottom = Lighten(bottom, 0.06f);
+                top = Lighten(top, 0.12f);
+                bottom = Lighten(bottom, 0.08f);
+                rim = ButtonKind == Kind.Secondary ? Accent : Lighten(rim, 0.15f);
             }
 
             using (var bodyPath = CreateRoundRect(bodyRect, radius))
             {
+                if (Enabled && (_hover || ButtonKind == Kind.Primary))
+                {
+                    var glowRect = Rectangle.Inflate(bodyRect, 1, 1);
+                    using var glowPath = CreateRoundRect(glowRect, radius + 1);
+                    using var glowPen = new Pen(Color.FromArgb(_hover ? 55 : 30, rim), 2f);
+                    g.DrawPath(glowPen, glowPath);
+                }
+
                 using (var fill = new LinearGradientBrush(bodyRect, top, bottom, 90f))
                     g.FillPath(fill, bodyPath);
 
-                var sheenH = Math.Max(7, bodyRect.Height / 2);
-                var sheenRect = new Rectangle(bodyRect.X + 1, bodyRect.Y + 1, bodyRect.Width - 2, sheenH);
-                using (var sheenPath = CreateRoundRect(sheenRect, Math.Max(1, radius - 1)))
-                using (var sheen = new LinearGradientBrush(
-                           sheenRect,
-                           Color.FromArgb(_pressed ? 40 : 85, 255, 255, 255),
-                           Color.FromArgb(0, 255, 255, 255),
-                           90f))
-                {
-                    g.SetClip(bodyPath);
-                    g.FillPath(sheen, sheenPath);
-                    g.ResetClip();
-                }
-
-                using var rimPen = new Pen(Color.FromArgb(100, rim), 1.1f);
+                var rimAlpha = !Enabled ? 40 : (_hover ? 255 : (ButtonKind == Kind.Secondary ? 90 : 220));
+                using var rimPen = new Pen(Color.FromArgb(rimAlpha, rim), ButtonKind == Kind.Primary ? 1.2f : 1.4f);
                 g.DrawPath(rimPen, bodyPath);
-                var inner = Rectangle.Inflate(bodyRect, -1, -1);
-                if (inner.Width > 4 && inner.Height > 4)
-                {
-                    using var innerPath = CreateRoundRect(inner, Math.Max(1, radius - 1));
-                    using var hi = new Pen(Color.FromArgb(_pressed ? 28 : 60, 255, 255, 255), 1f);
-                    g.DrawPath(hi, innerPath);
-                }
 
                 if (Focused && ShowFocusCues)
                 {
-                    var focus = Rectangle.Inflate(bodyRect, -3, -3);
+                    var focus = Rectangle.Inflate(bodyRect, -2, -2);
                     if (focus.Width > 4 && focus.Height > 4)
                     {
                         using var focusPath = CreateRoundRect(focus, Math.Max(1, radius - 2));
-                        using var focusPen = new Pen(Color.FromArgb(180, 255, 255, 255)) { DashStyle = DashStyle.Dot };
+                        using var focusPen = new Pen(Color.FromArgb(140, Accent)) { DashStyle = DashStyle.Dot };
                         g.DrawPath(focusPen, focusPath);
                     }
                 }
@@ -1096,14 +1097,6 @@ public sealed class MainForm : Form
             var textRect = bodyRect;
             if (_pressed) textRect.Offset(0, 1);
 
-            if (Enabled && !_pressed)
-            {
-                var shadowText = textRect;
-                shadowText.Offset(0, 1);
-                TextRenderer.DrawText(g, _caption, Font, shadowText,
-                    Color.FromArgb(55, 0, 0, 0), flags);
-            }
-
             TextRenderer.DrawText(g, _caption, Font, textRect, text, flags);
         }
 
@@ -1112,22 +1105,22 @@ public sealed class MainForm : Form
             switch (ButtonKind)
             {
                 case Kind.Secondary:
-                    top = Color.FromArgb(78, 98, 168);
-                    bottom = Color.FromArgb(42, 58, 118);
-                    rim = Color.FromArgb(150, 170, 255);
-                    text = TextPrimary;
+                    top = Color.FromArgb(19, 29, 44);
+                    bottom = Color.FromArgb(14, 22, 34);
+                    rim = Color.FromArgb(42, 60, 88);
+                    text = Color.FromArgb(235, 242, 250);
                     break;
                 case Kind.Danger:
-                    top = Color.FromArgb(255, 110, 130);
-                    bottom = Color.FromArgb(170, 48, 72);
-                    rim = Color.FromArgb(255, 170, 180);
-                    text = Color.White;
+                    top = Color.FromArgb(34, 16, 24);
+                    bottom = Color.FromArgb(24, 11, 17);
+                    rim = Color.FromArgb(225, 29, 72);
+                    text = Color.FromArgb(255, 160, 175);
                     break;
                 default:
-                    top = Color.FromArgb(120, 235, 250);
-                    bottom = Color.FromArgb(28, 175, 205);
-                    rim = Color.FromArgb(200, 250, 255);
-                    text = Color.FromArgb(8, 24, 42);
+                    top = Color.FromArgb(0, 210, 240);
+                    bottom = Color.FromArgb(0, 175, 215);
+                    rim = Color.FromArgb(0, 240, 255);
+                    text = Color.FromArgb(5, 17, 29);
                     break;
             }
         }
@@ -1235,13 +1228,12 @@ public sealed class MainForm : Form
 
     private void PaintWindowBackground(Graphics g, Rectangle bounds, bool fast = false)
     {
-        using (var brush = new LinearGradientBrush(bounds, BgDeep, BgMid, 45f))
+        using (var brush = new LinearGradientBrush(bounds, BgDeep, BgMid, 90f))
             g.FillRectangle(brush, bounds);
 
         var img = _circuitBackground;
         if (img != null && bounds.Width > 0 && bounds.Height > 0)
         {
-            // Cover-scale so the circuit fills gutters between cards without letterboxing.
             var scale = Math.Max(bounds.Width / (float)img.Width, bounds.Height / (float)img.Height);
             var w = (int)Math.Ceiling(img.Width * scale);
             var h = (int)Math.Ceiling(img.Height * scale);
@@ -1251,20 +1243,25 @@ public sealed class MainForm : Form
             g.InterpolationMode = fast
                 ? InterpolationMode.Low
                 : InterpolationMode.HighQualityBilinear;
-            g.DrawImage(img, new Rectangle(x, y, w, h));
-            g.InterpolationMode = oldInterp;
 
-            // Keep it atmospheric so opaque section cards stay the focus.
-            using var tint = new SolidBrush(Color.FromArgb(118, 8, 16, 36));
-            g.FillRectangle(tint, bounds);
+            using (var ia = new System.Drawing.Imaging.ImageAttributes())
+            {
+                var matrix = new System.Drawing.Imaging.ColorMatrix { Matrix33 = 0.32f };
+                ia.SetColorMatrix(matrix, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
+                g.DrawImage(img, new Rectangle(x, y, w, h), 0, 0, img.Width, img.Height, GraphicsUnit.Pixel, ia);
+            }
+            g.InterpolationMode = oldInterp;
         }
 
-        using var glow = new LinearGradientBrush(
-            new Rectangle(bounds.Width / 3, -40, Math.Max(1, bounds.Width / 2), 180),
-            Color.FromArgb(28, AccentHot),
-            Color.FromArgb(0, AccentHot),
-            90f);
-        g.FillRectangle(glow, bounds.Width / 3, 0, Math.Max(1, bounds.Width / 2), 160);
+        if (bounds.Width > 0 && bounds.Height > 0)
+        {
+            using var glow = new LinearGradientBrush(
+                new Rectangle(bounds.Width / 4, 0, Math.Max(1, bounds.Width / 2), 160),
+                Color.FromArgb(22, Accent),
+                Color.FromArgb(0, Accent),
+                90f);
+            g.FillRectangle(glow, bounds.Width / 4, 0, Math.Max(1, bounds.Width / 2), 160);
+        }
     }
 
     private static Image? LoadCircuitBackground()
@@ -1277,6 +1274,64 @@ public sealed class MainForm : Form
         }
         catch { /* ignore */ }
         return null;
+    }
+
+    internal void PopulateMockupState()
+    {
+        _mockupMode = true;
+        _searchPulseTimer?.Stop();
+        _pingTimer?.Stop();
+        _portPollTimer?.Stop();
+        _inventoryTimer?.Stop();
+        StopPhoneWatch();
+
+        _connectHero.Headline = "Connected";
+        _connectHero.HeadlineColor = Accent;
+        _connectHero.Hint = "";
+
+        _serverList.Items.Clear();
+        var s1 = new OnlineServer("192.168.68.61", "Wi-Fi host...")
+        {
+            BatteryPercent = 12,
+            LastRttMs = 55,
+        };
+        var s2 = new OnlineServer("192.168.68.66", "USB hosts");
+        _serverList.Items.Add(s1);
+        _serverList.Items.Add(s2);
+        _serverList.SelectedIndex = 0;
+        UpdateListEmptyVisible(_serverList, _serversEmpty);
+
+        _deviceList.Items.Clear();
+        _devicesEmpty.SetCopy("All devices in use", "Active devices are listed below");
+        UpdateDevicesEmptyVisible();
+
+        _attachedList.Items.Clear();
+        var a1 = new AttachedUsbDevice(
+            Port: 1,
+            Description: "CX 2.4G Receiver",
+            Vid: null,
+            Pid: null,
+            RemoteHost: "192.168.68.61",
+            BusId: null,
+            Speed: null,
+            PhoneLabel: "CX 2.4G Receiver",
+            AutoConnect: true);
+        _attachedCache = new List<AttachedUsbDevice> { a1 };
+        _attachedList.Items.Add(a1);
+        _attachedList.SelectedIndex = -1;
+        UpdateListEmptyVisible(_attachedList, _attachedEmpty);
+
+        _disconnectRow.Visible = true;
+        _disconnectBtn.Enabled = true;
+        _disconnectAllBtn.Enabled = true;
+        if (_attachedBody != null && _attachedBody.RowStyles.Count > 1)
+            _attachedBody.RowStyles[1].Height = 96f * UiScale;
+
+        _logBox.Clear();
+        _logBox.Append("2021-09-07 12:20:02", "Information USB Contenal USB devices");
+        _logBox.Append("2021-09-07 12:20:02", "Internecting USB device...");
+        _logBox.Append("2021-09-07 22:27:03", "Informtion strts 'CPU Roentist command'.");
+        _logBox.Append("2021-09-07 12:27:02", "Informting host device...");
     }
 
     private void ToggleManualAddress()
@@ -1303,9 +1358,8 @@ public sealed class MainForm : Form
     private void UpdateListEmptyVisible(SoftListBox list, SoftEmptyState empty)
     {
         var showEmpty = list.Items.Count == 0;
-        if (empty.Visible == showEmpty)
-            return;
         empty.Visible = showEmpty;
+        list.Visible = !showEmpty;
         if (showEmpty) empty.BringToFront();
         else list.BringToFront();
     }
@@ -1322,7 +1376,7 @@ public sealed class MainForm : Form
         _disconnectAllBtn.Enabled = hasActive && _cli != null;
         if (_attachedBody != null && _attachedBody.RowStyles.Count > 1)
         {
-            var target = hasActive ? 56f : 0f;
+            var target = hasActive ? 96f * UiScale : 0f;
             if (Math.Abs(_attachedBody.RowStyles[1].Height - target) > 0.5f)
                 _attachedBody.RowStyles[1].Height = target;
         }
@@ -1355,7 +1409,10 @@ public sealed class MainForm : Form
 
     private void PopulateAvailableDevices(IEnumerable<RemoteUsbDevice> devices, string host)
     {
-        _remoteCache = devices.Select(WithPhoneLabel).ToList();
+        _remoteCache = devices
+            .Where(d => !IsTombstoned(d.BusId, d.Vid, d.Pid))
+            .Select(WithPhoneLabel)
+            .ToList();
         var available = _remoteCache
             .Where(d => !_attachedCache.Any(a => IsAttachedMatch(d, a, host)))
             .Select(d => d with { AutoConnect = IsAutoConnectTarget(d) })
@@ -1503,6 +1560,8 @@ public sealed class MainForm : Form
             existing.AdvertisedDevices.Clear();
             foreach (var d in server.PluggedDevices)
             {
+                if (IsTombstoned(d.BusId, d.Vid, d.Pid))
+                    continue;
                 if (!string.IsNullOrWhiteSpace(d.BusId))
                     existing.PluggedBusIds.Add(d.BusId.Trim());
                 if (!string.IsNullOrWhiteSpace(d.Vid) && !string.IsNullOrWhiteSpace(d.Pid))
@@ -1669,7 +1728,9 @@ public sealed class MainForm : Form
                 server.PluggedBusIds.Remove(evt.BusId);
                 if (evt.Vid != null && evt.Pid != null)
                     server.PluggedVidPids.Remove($"{evt.Vid}:{evt.Pid}");
+                server.AdvertisedDevices.RemoveAll(r => IsGoneRemote(r, evt));
             }
+            TombstoneGone(evt.BusId, evt.Vid, evt.Pid);
 
             // Capture before port refresh — TCP may already have dropped the VHCI port.
             var prior = _attachedCache.ToList();
@@ -1891,6 +1952,32 @@ public sealed class MainForm : Form
         {
             _detachStaleBusy = false;
         }
+    }
+
+    private void TombstoneGone(string? busId, string? vid, string? pid)
+    {
+        var until = DateTime.UtcNow.AddMilliseconds(3500);
+        if (!string.IsNullOrWhiteSpace(busId))
+            _goneUntil[busId.Trim()] = until;
+        if (!string.IsNullOrWhiteSpace(vid) && !string.IsNullOrWhiteSpace(pid))
+            _goneUntil[$"{vid}:{pid}"] = until;
+    }
+
+    private bool IsTombstoned(string? busId, string? vid, string? pid)
+    {
+        var now = DateTime.UtcNow;
+        if (_goneUntil.Count > 0)
+        {
+            foreach (var key in _goneUntil.Where(kv => kv.Value <= now).Select(kv => kv.Key).ToList())
+                _goneUntil.Remove(key);
+        }
+        if (!string.IsNullOrWhiteSpace(busId) &&
+            _goneUntil.TryGetValue(busId.Trim(), out var byBus) && now < byBus)
+            return true;
+        if (!string.IsNullOrWhiteSpace(vid) && !string.IsNullOrWhiteSpace(pid) &&
+            _goneUntil.TryGetValue($"{vid}:{pid}", out var byId) && now < byId)
+            return true;
+        return false;
     }
 
     private static bool IsGoneRemote(RemoteUsbDevice remote, PhoneEventListener.DeviceGoneEvent evt)
@@ -2236,6 +2323,7 @@ public sealed class MainForm : Form
 
             await ApplyPortStatusAsync(updateStatusWhenAttached: false);
         }
+        catch { /* ignore */ }
         finally
         {
             _portPollBusy = false;
@@ -2262,6 +2350,7 @@ public sealed class MainForm : Form
             await FindPhoneAsync(autoRefresh: true, quiet: true, fromWatch: true);
             PruneStaleServers(TimeSpan.FromSeconds(20));
         }
+        catch { /* ignore background poll exceptions, especially during shutdown */ }
         finally
         {
             _inventoryBusy = false;
@@ -2313,7 +2402,7 @@ public sealed class MainForm : Form
     /// <summary>Read local usbip port state into the Active panel.</summary>
     private async Task<bool> ApplyPortStatusAsync(bool updateStatusWhenAttached)
     {
-        if (_cli == null) return false;
+        if (_mockupMode || _cli == null) return false;
         try
         {
             void Apply(IReadOnlyList<AttachedUsbDevice> attached, string? rawForLog)
@@ -2462,7 +2551,7 @@ public sealed class MainForm : Form
 
     private async Task OnFirstShownAsync()
     {
-        if (_autoFindStarted) return;
+        if (_mockupMode || _autoFindStarted) return;
         _autoFindStarted = true;
         // Show any already-attached device immediately (before discovery).
         await ApplyPortStatusAsync(updateStatusWhenAttached: true);
@@ -2699,8 +2788,12 @@ public sealed class MainForm : Form
         bool fromWatch = false,
         CancellationToken ct = default)
     {
-        if (!await _findLock.WaitAsync(TimeSpan.FromSeconds(8), ct))
-            return false;
+        try
+        {
+            if (!await _findLock.WaitAsync(TimeSpan.FromSeconds(8), ct))
+                return false;
+        }
+        catch { return false; }
 
         try
         {
@@ -2861,7 +2954,7 @@ public sealed class MainForm : Form
         {
             UseWaitCursor = false;
             _findBtn.Enabled = true;
-            _findLock.Release();
+            try { _findLock.Release(); } catch { /* ignore */ }
         }
     }
 
@@ -3061,7 +3154,7 @@ public sealed class MainForm : Form
 
             Log("Connected. You can close this window — it stays in the tray.");
             SetStatus("Connected — device ready on this PC", OkGreen);
-            _connectHero.Hint = "Use Disconnect on an active device, or Disconnect all.";
+            _connectHero.Hint = "";
             SaveHost(host);
             StopPhoneWatch();
         }
@@ -3470,7 +3563,7 @@ public sealed class MainForm : Form
             BackColor = BgMid,
             ForeColor = TextPrimary,
             Font = Font,
-            ClientSize = new Size(460, 250),
+            ClientSize = new Size((int)(460 * UiScale), (int)(250 * UiScale)),
         };
 
         var layout = new TableLayoutPanel
@@ -3482,14 +3575,14 @@ public sealed class MainForm : Form
             BackColor = BgMid,
         };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40 * UiScale));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         var copy = new Label
         {
             Text = "Close the window, or keep UsbNetBridge running in the tray?\n\nConnected USB devices stay attached if you minimize to tray.",
             AutoSize = true,
-            MaximumSize = new Size(410, 0),
+            MaximumSize = new Size((int)(410 * UiScale), 0),
             ForeColor = TextPrimary,
             BackColor = BgMid,
             Margin = new Padding(0, 0, 0, 8),
@@ -3942,11 +4035,9 @@ public sealed class MainForm : Form
         else Append();
     }
 
-    /// <summary>Double-buffered title logo (PictureBox flickers on resize).</summary>
+    /// <summary>Double-buffered title logo rendering sleek vector brand icon + 2-tone title ("UsbNet" cyan + "Bridge" white).</summary>
     private sealed class BufferedLogo : Control
     {
-        public Image? Image { get; set; }
-
         public BufferedLogo()
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint |
@@ -3958,19 +4049,202 @@ public sealed class MainForm : Form
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            var img = Image;
-            if (img == null || Width <= 0 || Height <= 0)
+            if (Width <= 0 || Height <= 0)
                 return;
 
             var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            var scale = Math.Min(Width / (float)img.Width, Height / (float)img.Height);
-            var w = img.Width * scale;
-            var h = img.Height * scale;
-            var x = (Width - w) / 2f;
-            var y = (Height - h) / 2f;
-            g.DrawImage(img, x, y, w, h);
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            // Brand font: bold Segoe UI / sans-serif at 25pt
+            using var font = UiTheme.TryFont(
+                ("Segoe UI", 25f, FontStyle.Bold),
+                ("Arial", 25f, FontStyle.Bold),
+                ("sans-serif", 25f, FontStyle.Bold));
+
+            const string text1 = "UsbNet";
+            const string text2 = "Bridge";
+            var sf = StringFormat.GenericTypographic;
+
+            var size1 = g.MeasureString(text1, font, PointF.Empty, sf);
+            var size2 = g.MeasureString(text2, font, PointF.Empty, sf);
+
+            float iconSize = Math.Min(48f, Math.Max(36f, Height - 12f));
+            float iconMargin = 14f;
+            float totalWidth = iconSize + iconMargin + size1.Width + size2.Width;
+
+            float startX = Math.Max(0, (Width - totalWidth) / 2f);
+            float iconY = (Height - iconSize) / 2f;
+            float textY = (Height - size1.Height) / 2f;
+
+            // Draw vector brand icon
+            DrawBrandVectorIcon(g, new RectangleF(startX, iconY, iconSize, iconSize));
+
+            // Draw subtle neon glow behind UsbNet
+            float textX1 = startX + iconSize + iconMargin;
+            using (var glowBrush = new SolidBrush(Color.FromArgb(35, 0, 240, 255)))
+            {
+                g.DrawString(text1, font, glowBrush, textX1 - 1f, textY, sf);
+                g.DrawString(text1, font, glowBrush, textX1 + 1f, textY, sf);
+                g.DrawString(text1, font, glowBrush, textX1, textY - 1f, sf);
+                g.DrawString(text1, font, glowBrush, textX1, textY + 1f, sf);
+            }
+
+            // Draw 2-Tone Title: "UsbNet" (cyan) + "Bridge" (white)
+            using (var brushCyan = new SolidBrush(Color.FromArgb(0, 240, 255)))
+            {
+                g.DrawString(text1, font, brushCyan, textX1, textY, sf);
+            }
+
+            float textX2 = textX1 + size1.Width;
+            using (var brushWhite = new SolidBrush(Color.FromArgb(255, 255, 255)))
+            {
+                g.DrawString(text2, font, brushWhite, textX2, textY, sf);
+            }
+        }
+
+        private static void DrawBrandVectorIcon(Graphics g, RectangleF bounds)
+        {
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+                return;
+
+            var state = g.Save();
+            try
+            {
+                g.TranslateTransform(bounds.X, bounds.Y);
+                var scale = Math.Min(bounds.Width / 52f, bounds.Height / 52f);
+                g.ScaleTransform(scale, scale);
+
+                // USB Metal Shroud (Top)
+                using (var shroudPath = new GraphicsPath())
+                {
+                    shroudPath.AddLine(12f, 4.5f, 24f, 4.5f);
+                    shroudPath.AddArc(23.5f, 4.5f, 2.3f, 2.3f, 270, 90);
+                    shroudPath.AddLine(25.8f, 6.3f, 25.8f, 12.5f);
+                    shroudPath.AddLine(25.8f, 12.5f, 10.2f, 12.5f);
+                    shroudPath.AddLine(10.2f, 12.5f, 10.2f, 6.3f);
+                    shroudPath.AddArc(10.2f, 4.5f, 2.3f, 2.3f, 180, 90);
+                    shroudPath.CloseFigure();
+
+                    using var fillBrush = new SolidBrush(Color.FromArgb(34, 0, 229, 255));
+                    g.FillPath(fillBrush, shroudPath);
+                    using var strokePen = new Pen(Color.FromArgb(0, 229, 255), 2.2f)
+                    {
+                        LineJoin = LineJoin.Round
+                    };
+                    g.DrawPath(strokePen, shroudPath);
+                }
+
+                // USB Contact Pins / Holes inside Shroud
+                using (var pinBrush = new SolidBrush(Color.FromArgb(0, 229, 255)))
+                {
+                    g.FillRectangle(pinBrush, 13f, 6.8f, 3f, 3.4f);
+                    g.FillRectangle(pinBrush, 20f, 6.8f, 3f, 3.4f);
+                }
+
+                // USB Body Collar (rounded rect)
+                using (var bodyPath = new GraphicsPath())
+                {
+                    float bx = 6f, by = 12.5f, bw = 24f, bh = 21f, br = 3.5f;
+                    bodyPath.AddArc(bx + bw - 2 * br, by, 2 * br, 2 * br, 270, 90);
+                    bodyPath.AddArc(bx + bw - 2 * br, by + bh - 2 * br, 2 * br, 2 * br, 0, 90);
+                    bodyPath.AddArc(bx, by + bh - 2 * br, 2 * br, 2 * br, 90, 90);
+                    bodyPath.AddArc(bx, by, 2 * br, 2 * br, 180, 90);
+                    bodyPath.CloseFigure();
+
+                    using var bodyFill = new SolidBrush(Color.FromArgb(40, 11, 19, 38));
+                    g.FillPath(bodyFill, bodyPath);
+                    using var bodyPen = new Pen(Color.FromArgb(0, 229, 255), 2.2f)
+                    {
+                        LineJoin = LineJoin.Round
+                    };
+                    g.DrawPath(bodyPen, bodyPath);
+                }
+
+                // USB Internal Trident Arrow Stem
+                using (var stemPen = new Pen(Color.FromArgb(0, 229, 255), 2.0f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    g.DrawLine(stemPen, 18f, 30.5f, 18f, 18.5f);
+                }
+
+                // Trident Arrowhead (pointing up)
+                using (var arrowBrush = new SolidBrush(Color.FromArgb(0, 229, 255)))
+                {
+                    PointF[] arrow = { new(18f, 14.5f), new(14.5f, 19f), new(21.5f, 19f) };
+                    g.FillPolygon(arrowBrush, arrow);
+                }
+
+                // Trident Left Branch (Curved to Circle)
+                using (var branchPen = new Pen(Color.FromArgb(0, 229, 255), 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    using var p = new GraphicsPath();
+                    p.AddBezier(18f, 25.5f, 15.5f, 25.5f, 12.5f, 24.5f, 12.5f, 22f);
+                    p.AddLine(12.5f, 22f, 12.5f, 20.8f);
+                    g.DrawPath(branchPen, p);
+                }
+                using (var circleBrush = new SolidBrush(Color.FromArgb(0, 229, 255)))
+                {
+                    g.FillEllipse(circleBrush, 12.5f - 1.6f, 19.5f - 1.6f, 3.2f, 3.2f);
+                }
+
+                // Trident Right Branch (Curved to Square)
+                using (var branchPen = new Pen(Color.FromArgb(0, 229, 255), 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    using var p = new GraphicsPath();
+                    p.AddBezier(18f, 24.5f, 20.5f, 24.5f, 23.5f, 23.5f, 23.5f, 21.5f);
+                    p.AddLine(23.5f, 21.5f, 23.5f, 20.8f);
+                    g.DrawPath(branchPen, p);
+                }
+                using (var squareBrush = new SolidBrush(Color.FromArgb(0, 229, 255)))
+                {
+                    g.FillRectangle(squareBrush, 22.2f, 18.8f, 2.6f, 2.6f);
+                }
+
+                // Cable Loop from Bottom of Plug
+                using (var cablePen = new Pen(Color.FromArgb(0, 180, 216), 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    using var p = new GraphicsPath();
+                    p.AddBezier(18f, 33.5f, 18f, 40f, 19.5f, 45f, 25f, 45f);
+                    p.AddBezier(25f, 45f, 30.5f, 45f, 32.5f, 40.5f, 32.5f, 35f);
+                    p.AddLine(32.5f, 35f, 32.5f, 30f);
+                    g.DrawPath(cablePen, p);
+                }
+
+                // Circuit Node at Cable End
+                using (var nodeBrush = new SolidBrush(Color.FromArgb(0, 229, 255)))
+                {
+                    g.FillEllipse(nodeBrush, 32.5f - 2.2f, 28.5f - 2.2f, 4.4f, 4.4f);
+                }
+
+                // Wi-Fi Broadcast Waves (Upper Right of Plug)
+                // Wave 1
+                using (var wave1Pen = new Pen(Color.FromArgb(0, 180, 216), 2.2f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    using var p = new GraphicsPath();
+                    p.AddBezier(30f, 12.5f, 32.5f, 9.8f, 35.8f, 8.2f, 39.5f, 8.2f);
+                    g.DrawPath(wave1Pen, p);
+                }
+                // Wave 2
+                using (var wave2Pen = new Pen(Color.FromArgb(0, 210, 255), 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    using var p = new GraphicsPath();
+                    p.AddBezier(33f, 16f, 36.8f, 11.5f, 41.5f, 9f, 46.5f, 9f);
+                    g.DrawPath(wave2Pen, p);
+                }
+                // Wave 3
+                using (var wave3Pen = new Pen(Color.FromArgb(0, 240, 255), 2.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    using var p = new GraphicsPath();
+                    p.AddBezier(36f, 19.5f, 41f, 13f, 46f, 10f, 51f, 10f);
+                    g.DrawPath(wave3Pen, p);
+                }
+            }
+            finally
+            {
+                g.Restore(state);
+            }
         }
     }
 

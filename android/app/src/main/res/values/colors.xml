@@ -1,29 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Match Windows client: deep blue / cyan / indigo -->
-    <color name="bg">#FF0C1630</color>
-    <color name="bg_mid">#FF162448</color>
-    <color name="surface">#FF20305C</color>
-    <color name="surface_lite">#FF2A3E76</color>
-    <color name="input_bg">#FF121C3A</color>
-    <color name="ink">#FFF5FAFF</color>
-    <color name="muted">#FFAABEDE</color>
-    <color name="line">#FF4664AA</color>
-    <color name="accent">#FF38D2E8</color>
-    <color name="accent_dark">#FF28A8BC</color>
-    <color name="accent_hot">#FF788CFF</color>
-    <color name="accent_soft">#FF1A3558</color>
-    <color name="on_accent">#FF0A1428</color>
-    <color name="accent_disabled">#FF3A4A68</color>
-    <color name="on_accent_disabled">#FF7A90B0</color>
-    <color name="danger">#FFFF6E78</color>
-    <color name="warning">#FFFFB020</color>
-    <color name="ok">#FF48D2A0</color>
-    <color name="status_stopped">#FF8A9CB8</color>
-    <color name="status_waiting">#FF38D2E8</color>
-    <color name="status_sharing">#FF48D2A0</color>
-    <color name="log_bg">#FF0A1024</color>
-    <color name="log_fg">#FFB4D2E6</color>
-    <!-- Adaptive icon plate — matches dark art interior (not white) -->
-    <color name="ic_launcher_background">#FF0A0A1E</color>
+    <!-- Modern Obsidian & Cyber Neon Palette (Matches Mockup) -->
+    <color name="bg">#FF080C14</color>
+    <color name="bg_mid">#FF0B121E</color>
+    <color name="surface">#FF0E1624</color>
+    <color name="surface_card">#FF0E1624</color>
+    <color name="surface_lite">#FF141F32</color>
+    <color name="input_bg">#FF0A0F1A</color>
+    <color name="ink">#FFFFFFFF</color>
+    <color name="muted">#FF8E9CAE</color>
+    <color name="line">#FF1E2B3E</color>
+    <color name="accent">#FF00E5FF</color>
+    <color name="accent_dark">#FF00A3C4</color>
+    <color name="accent_hot">#FF00E5FF</color>
+    <color name="accent_button">#FF00A3C4</color>
+    <color name="accent_soft">#FF102838</color>
+    <color name="on_accent">#FF080C14</color>
+    <color name="accent_disabled">#FF162232</color>
+    <color name="on_accent_disabled">#FF5A6E88</color>
+    <color name="button_stop_bg">#FF131C2A</color>
+    <color name="button_stop_border">#FF22324A</color>
+    <color name="status_pill_bg">#FF101724</color>
+    <color name="status_pill_border">#FF1E2B3E</color>
+    <color name="tile_bg">#FF1A2536</color>
+    <color name="pill_meta_bg">#FF16202E</color>
+    <color name="danger">#FFE11D48</color>
+    <color name="warning">#FFF59E0B</color>
+    <color name="ok">#FF00E676</color>
+    <color name="status_stopped">#FF8E9CAE</color>
+    <color name="status_waiting">#FF00E5FF</color>
+    <color name="status_sharing">#FF00E676</color>
+    <color name="log_bg">#FF06090F</color>
+    <color name="log_fg">#FFE0E6ED</color>
+    <!-- Adaptive icon plate -->
+    <color name="ic_launcher_background">#FF080C14</color>
 </resources>

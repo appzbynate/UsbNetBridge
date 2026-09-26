@@ -29,6 +29,7 @@ class DiscoveryBeacon(
     @Volatile private var shareClientIp: String? = null
     @Volatile private var shareClientName: String? = null
     @Volatile private var usbSummaryCache: String = ""
+    private val hiddenDeviceIds = java.util.Collections.synchronizedSet(HashSet<Int>())
 
     fun start() {
         refreshUsbCache()
@@ -36,10 +37,11 @@ class DiscoveryBeacon(
         thread = Thread({
             try {
                 acquireMulticastLock()
-                val sock = DatagramSocket(DISCOVERY_PORT).apply {
-                    broadcast = true
+                val sock = DatagramSocket(null as java.net.SocketAddress?).apply {
                     reuseAddress = true
+                    broadcast = true
                     soTimeout = 1000
+                    bind(java.net.InetSocketAddress(DISCOVERY_PORT))
                 }
                 socket = sock
                 onLog("LAN discovery listening on UDP $DISCOVERY_PORT")
@@ -139,7 +141,7 @@ class DiscoveryBeacon(
             sendEvent(payload, clientIps, "Device-gone notify failed")
             // Last USB device is gone — Android will stop the server. Tell Windows now,
             // on this same path (the one that already works for unplug).
-            refreshUsbCache()
+            // Do not re-read UsbManager here: OEMs often still list the just-unplugged device.
             if (usbSummaryCache.isEmpty()) {
                 notifyServerOffline(clientIps)
             } else {
@@ -186,6 +188,16 @@ class DiscoveryBeacon(
         }
     }
 
+    fun hideUsbDevice(deviceId: Int) {
+        hiddenDeviceIds.add(deviceId)
+        refreshUsbCache()
+    }
+
+    fun unhideUsbDevice(deviceId: Int) {
+        hiddenDeviceIds.remove(deviceId)
+        refreshUsbCache()
+    }
+
     /** Re-read UsbManager. Call on plug/unplug — not from the beacon loop. */
     fun refreshUsbCache() {
         usbSummaryCache = computePluggedUsbSummary()
@@ -219,7 +231,7 @@ class DiscoveryBeacon(
             val usb = context.applicationContext
                 .getSystemService(Context.USB_SERVICE) as? android.hardware.usb.UsbManager
                 ?: return ""
-            usb.deviceList.values.map { d ->
+            usb.deviceList.values.filter { d -> d.deviceId !in hiddenDeviceIds }.map { d ->
                 val busnum = d.deviceId / 1000
                 val devnum = d.deviceId % 1000
                 val busid = "$busnum-$devnum"
@@ -294,18 +306,6 @@ class DiscoveryBeacon(
             Uri.decode(raw)
         } catch (_: Exception) {
             raw
-        }
-    }
-
-    private fun friendlyUsbName(d: android.hardware.usb.UsbDevice): String {
-        val product = d.productName?.trim().orEmpty()
-        val manufacturer = d.manufacturerName?.trim().orEmpty()
-        return when {
-            product.isNotEmpty() && manufacturer.isNotEmpty() &&
-                !product.contains(manufacturer, ignoreCase = true) -> "$manufacturer $product"
-            product.isNotEmpty() -> product
-            manufacturer.isNotEmpty() -> manufacturer
-            else -> "USB device"
         }
     }
 
@@ -408,5 +408,18 @@ class DiscoveryBeacon(
         const val OFFLINE_PREFIX = "UNB1-off|"
         private const val BEACON_INTERVAL_MS = 3000L
         private const val BEACON_WHILE_SHARING_MS = 15000L
+
+        /** Single source of truth for USB device display name, matching Windows client discovery. */
+        fun friendlyUsbName(d: android.hardware.usb.UsbDevice): String {
+            val product = d.productName?.trim().orEmpty()
+            val manufacturer = d.manufacturerName?.trim().orEmpty()
+            return when {
+                product.isNotEmpty() && manufacturer.isNotEmpty() &&
+                    !product.contains(manufacturer, ignoreCase = true) -> "$manufacturer $product"
+                product.isNotEmpty() -> product
+                manufacturer.isNotEmpty() -> manufacturer
+                else -> "USB device"
+            }
+        }
     }
 }

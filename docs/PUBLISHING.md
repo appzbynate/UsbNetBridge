@@ -32,7 +32,7 @@ git push origin v2.0.0
 ## You must do these in Play Console
 
 1. Create the app (`com.usbnetbridge.server`).
-2. Paste listing copy from [`play-listing.md`](play-listing.md). Take phone screenshots of the Android app (and optional PC screenshots) yourself.
+2. Paste listing copy from [`play-listing.md`](play-listing.md). Upload graphic assets from [`play-assets/`](play-assets/README.md) (icon, feature graphic, phone screenshots). Promo video: upload `play-assets/video/promo-16x9.mp4` to YouTube and paste the URL.
 3. Privacy policy URL — use the GitHub Pages URL above once Pages is on. Until then Play may accept:
    `https://github.com/appzbynate/UsbNetBridge/blob/main/PRIVACY.md`
 4. **Foreground service / special use** — declare `specialUse` and paste the paragraph in `play-listing.md`.
