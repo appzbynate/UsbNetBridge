@@ -1309,6 +1309,11 @@ public sealed class MainForm : Form
         _manualToggle.Text = _manualAddressVisible
             ? "Hide manual address"
             : "Enter address manually";
+        _manualToggle.LinkArea = new LinkArea(0, _manualToggle.Text.Length);
+        
+        // Force WinForms to recalculate nested AutoSize bounds before focusing
+        _manualRow?.Parent?.PerformLayout();
+
         if (_manualAddressVisible)
             _hostBox.Focus();
     }
