@@ -254,6 +254,7 @@
                         android:layout_height="48dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_btn_stop"
+                        app:backgroundTint="@null"
                         android:enabled="false"
                         android:stateListAnimator="@null"
                         android:text="@string/stop"

@@ -229,8 +229,12 @@ class MainActivity : AppCompatActivity() {
             detailsView.text = String.format(Locale.US, "%04x:%04x  •  Bus [%s]", d.vendorId, d.productId, busid)
 
             when {
-                isSharing -> {
-                    badgeView.text = getString(R.string.badge_sharing, onPc)
+                UsbIpService.activeDeviceIds.contains(d.deviceId) -> {
+                    if (onPc.isNotBlank()) {
+                        badgeView.text = getString(R.string.badge_sharing, onPc)
+                    } else {
+                        badgeView.text = getString(R.string.badge_sharing, "PC")
+                    }
                     badgeView.setBackgroundResource(R.drawable.bg_badge_info)
                     badgeView.setTextColor(ContextCompat.getColor(this, R.color.accent))
                 }

@@ -25,7 +25,7 @@ internal static class UiTheme
 
     public const int CornerRadius = 22;
     public const int WellRadius = 18;
-    public const int ListItemHeight = 64;
+    public const int ListItemHeight = 38;
 
     public static void BindRoundRegion(Control control, int radius)
     {
@@ -572,6 +572,19 @@ internal sealed class SoftListBox : Control
             var bounds = new Rectangle(0, i * ItemHeight - _scrollY, Width, ItemHeight);
             DrawRow(g, bounds, i, i == _selectedIndex);
         }
+
+        var totalHeight = _items.Count * ItemHeight;
+        if (totalHeight > Height)
+        {
+            var thumbHeight = Math.Max(20, (int)((float)Height * Height / totalHeight));
+            var maxScroll = totalHeight - Height;
+            var scrollRatio = (float)_scrollY / maxScroll;
+            var thumbY = (int)(scrollRatio * (Height - thumbHeight));
+            var thumbRect = new Rectangle(Width - 6, thumbY + 2, 4, thumbHeight - 4);
+            using (var path = UiTheme.CreateRoundRect(thumbRect, 2))
+            using (var brush = new SolidBrush(Color.FromArgb(50, 255, 255, 255)))
+                g.FillPath(brush, path);
+        }
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -827,40 +840,27 @@ internal sealed class SoftListBox : Control
     private static void ResolveRow(object item, out string primary, out string secondary, out string? chip, out string? extraChip)
     {
         extraChip = null;
+        secondary = ""; // Keep the UI minimalist by default
         switch (item)
         {
             case OnlineServer s:
                 var showName = !string.IsNullOrWhiteSpace(s.Name) && !string.Equals(s.Name, s.Host, StringComparison.OrdinalIgnoreCase);
                 primary = showName ? s.Name : s.Host;
-                var statusParts = new List<string>();
-                if (showName) statusParts.Add(s.Host);
-                if (!string.IsNullOrWhiteSpace(s.StatusLine)) statusParts.Add(s.StatusLine);
-                secondary = string.Join("   ·   ", statusParts);
                 chip = s.StatusChip;
                 extraChip = s.BatteryChip;
                 return;
             case RemoteUsbDevice d:
                 primary = d.DisplayName;
-                secondary = d.Vid != null && d.Pid != null
-                    ? $"{d.Vid}:{d.Pid}   ·   [{d.BusId}]"
-                    : $"[{d.BusId}]";
                 chip = UsbClassHints.VerdictChip(d.ClassHint, d.Description);
                 extraChip = d.AutoConnect ? "Auto" : null;
                 return;
             case AttachedUsbDevice a:
                 primary = a.DisplayName;
-                var bits = new List<string>();
-                if (a.Vid != null && a.Pid != null) bits.Add($"{a.Vid}:{a.Pid}");
-                if (!string.IsNullOrEmpty(a.RemoteHost)) bits.Add(a.RemoteHost);
-                if (!string.IsNullOrEmpty(a.BusId)) bits.Add($"[{a.BusId}]");
-                bits.Add($"Port {a.Port:D2}");
-                secondary = string.Join("   ·   ", bits);
                 chip = "Connected";
                 extraChip = a.AutoConnect ? "Auto" : null;
                 return;
             default:
                 primary = item?.ToString() ?? "";
-                secondary = "";
                 chip = null;
                 return;
         }

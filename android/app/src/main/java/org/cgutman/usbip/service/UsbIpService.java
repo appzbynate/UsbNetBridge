@@ -76,6 +76,8 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 		return sharingClientIp;
 	}
 
+	public static final Set<Integer> activeDeviceIds = ConcurrentHashMap.newKeySet();
+
 	private static volatile int sharedCount = 0;
 	private static volatile String sharingClientName = "";
 	private static volatile String sharingClientIp = "";
@@ -266,6 +268,7 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 		
 		// Initialize fields
 		connections = new SparseArray<>();
+		activeDeviceIds.clear();
 		permission = new SparseArray<>();
 		socketMap = new HashMap<>();
 
@@ -1184,6 +1187,7 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 				new LinkedBlockingQueue<>());
 
 		connections.put(dev.getDeviceId(), context);
+		activeDeviceIds.add(dev.getDeviceId());
 		socketMap.put(s, context);
 
 		appLog("attachToDevice: opened, waiting for Windows SET_CONFIGURATION / URBs");
@@ -1257,6 +1261,7 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 		
 		// Clear the this attachment's context
 		connections.remove(deviceId);
+		activeDeviceIds.remove(deviceId);
 		
 		// Signal queue death
 		context.requestPool.shutdownNow();

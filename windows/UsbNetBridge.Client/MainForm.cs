@@ -14,7 +14,7 @@ public sealed class MainForm : Form
     private const int CornerRadius = 22;
     private const int WellRadius = 18;
     private const int ButtonHeight = 40;
-    private const int ActiveItemHeight = 64;
+    private const int ActiveItemHeight = 38;
     private const int ActiveVisibleLines = 2;
     // Section title + card chrome + list rows + Disconnect row (shown when a device is attached).
     private static int ActiveSectionHeight =>
@@ -44,7 +44,6 @@ public sealed class MainForm : Form
     private SoftTextWell? _hostWell;
     private readonly Soft3dButton _findBtn = new();
     private readonly Soft3dButton _refreshBtn = new();
-    private readonly Soft3dButton _disconnectAllBtn = new();
     private readonly ConnectingHero _connectHero = new();
     private readonly LinkLabel _manualToggle = new();
     private FlowLayoutPanel? _manualRow;
@@ -61,11 +60,7 @@ public sealed class MainForm : Form
     private readonly SoftEmptyState _serversEmpty = new();
     private readonly SoftEmptyState _devicesEmpty = new();
     private readonly SoftEmptyState _attachedEmpty = new();
-    private readonly Soft3dButton _disconnectBtn = new();
     private readonly Soft3dButton _clearLogBtn = new();
-    private readonly FlowLayoutPanel _disconnectRow = new BufferedFlowLayoutPanel();
-    private readonly Label _disconnectHint = new();
-    private TableLayoutPanel? _attachedBody;
     private readonly SoftLogView _logBox = new();
 
     private readonly NotifyIcon _tray;
@@ -208,13 +203,12 @@ public sealed class MainForm : Form
 
         _findBtn.Click += async (_, _) => await FindPhoneAsync(autoRefresh: true, quiet: false);
         _refreshBtn.Click += async (_, _) => await RefreshDevicesAsync();
-        _disconnectAllBtn.Click += async (_, _) => await DetachAllAsync();
         _deviceList.DoubleClick += async (_, _) => await AttachSelectedAsync();
         _deviceList.MouseUp += DeviceListOnMouseUp;
+        _serverList.MouseUp += ServerListOnMouseUp;
         _attachedList.SelectedIndexChanged += (_, _) => UpdateDisconnectUi();
         _attachedList.DoubleClick += async (_, _) => await DetachSelectedAsync();
         _attachedList.MouseUp += AttachedListOnMouseUp;
-        _disconnectBtn.Click += async (_, _) => await DetachSelectedAsync();
         _serverList.SelectedIndexChanged += (_, _) =>
         {
             if (_serverList.SelectedItem is OnlineServer s)
@@ -495,25 +489,12 @@ public sealed class MainForm : Form
         StyleSoftList(_attachedList);
 
         _serversEmpty.Glyph = SoftEmptyGlyph.None;
-        _serversEmpty.SetCopy("No USB hosts found", "Start UsbNetBridge on your phone or PC");
+        _serversEmpty.SetCopy("No USB hosts found", "");
         _devicesEmpty.Glyph = SoftEmptyGlyph.None;
-        _devicesEmpty.SetCopy("No devices yet", "Plug in a USB device, then Refresh");
+        _devicesEmpty.SetCopy("No devices yet", "");
         _attachedEmpty.Glyph = SoftEmptyGlyph.None;
-        _attachedEmpty.SetCopy("No active devices", "Double-click a device above to connect");
+        _attachedEmpty.SetCopy("No active devices", "Right-click devices for more options");
 
-        StyleSecondaryButton(_disconnectBtn, "Disconnect");
-        _disconnectBtn.Enabled = false;
-        _disconnectBtn.MinimumSize = new Size(130, ButtonHeight);
-        _disconnectBtn.Margin = new Padding(0, 8, 14, 0);
-        StyleDangerButton(_disconnectAllBtn, "Disconnect all");
-        _disconnectAllBtn.Enabled = false;
-        _disconnectAllBtn.MinimumSize = new Size(150, ButtonHeight);
-        _disconnectAllBtn.Margin = new Padding(0, 8, 0, 0);
-        _disconnectHint.Text = "Or double-click a row";
-        _disconnectHint.AutoSize = true;
-        _disconnectHint.ForeColor = Color.FromArgb(148, 163, 184);
-        _disconnectHint.Margin = new Padding(16, 14, 0, 0);
-        _disconnectHint.BackColor = Color.Transparent;
 
         StyleSecondaryButton(_clearLogBtn, "Clear");
         _clearLogBtn.Size = new Size(84, 32);
@@ -598,8 +579,8 @@ public sealed class MainForm : Form
             Margin = new Padding(0, 4, 0, 6),
         };
         mid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        mid.RowStyles.Add(new RowStyle(SizeType.Percent, 60));  // topMid (hosts + devices)
-        mid.RowStyles.Add(new RowStyle(SizeType.Percent, 40));  // active
+        mid.RowStyles.Add(new RowStyle(SizeType.Percent, 65));  // topMid (hosts + devices)
+        mid.RowStyles.Add(new RowStyle(SizeType.Percent, 35));  // active
 
         var topMid = new BufferedTableLayoutPanel
         {
@@ -699,10 +680,8 @@ public sealed class MainForm : Form
             Margin = new Padding(0),
             Padding = new Padding(0)
         };
-        _attachedBody = attachedBody;
         attachedBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         attachedBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // list fills remaining
-        attachedBody.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));  // disconnect row (dynamic)
 
         var attachedHost = new DoubleBufferedPanel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Padding = new Padding(2) };
         _attachedList.Dock = DockStyle.Fill;
@@ -711,17 +690,8 @@ public sealed class MainForm : Form
         attachedHost.Controls.Add(_attachedEmpty);
         _attachedEmpty.BringToFront();
 
-        _disconnectRow.FlowDirection = FlowDirection.LeftToRight;
-        _disconnectRow.WrapContents = true;
-        _disconnectRow.BackColor = Color.Transparent;
-        _disconnectRow.Padding = new Padding(0, 8, 0, 2);
-        _disconnectRow.Visible = false;
-        _disconnectRow.Controls.Add(_disconnectBtn);
-        _disconnectRow.Controls.Add(_disconnectAllBtn);
-        _disconnectRow.Controls.Add(_disconnectHint);
 
         attachedBody.Controls.Add(attachedHost, 0, 0);
-        attachedBody.Controls.Add(_disconnectRow, 0, 1);
 
         var attachedCard = MakeSectionCard("Active", attachedBody, null);
         attachedCard.Margin = new Padding(0, 12, 0, 0);
@@ -1302,7 +1272,7 @@ public sealed class MainForm : Form
         UpdateListEmptyVisible(_serverList, _serversEmpty);
 
         _deviceList.Items.Clear();
-        _devicesEmpty.SetCopy("All devices in use", "Active devices are listed below");
+        _devicesEmpty.SetCopy("All devices in use", "");
         UpdateDevicesEmptyVisible();
 
         _attachedList.Items.Clear();
@@ -1321,11 +1291,6 @@ public sealed class MainForm : Form
         _attachedList.SelectedIndex = -1;
         UpdateListEmptyVisible(_attachedList, _attachedEmpty);
 
-        _disconnectRow.Visible = true;
-        _disconnectBtn.Enabled = true;
-        _disconnectAllBtn.Enabled = true;
-        if (_attachedBody != null && _attachedBody.RowStyles.Count > 1)
-            _attachedBody.RowStyles[1].Height = 96f * UiScale;
 
         _logBox.Clear();
         _logBox.Append("2021-09-07 12:20:02", "Information USB Contenal USB devices");
@@ -1370,15 +1335,8 @@ public sealed class MainForm : Form
     private void UpdateDisconnectUi()
     {
         var hasActive = _attachedList.Items.Count > 0;
-        if (_disconnectRow.Visible != hasActive)
-            _disconnectRow.Visible = hasActive;
-        _disconnectBtn.Enabled = hasActive && _cli != null && _attachedList.SelectedItem is AttachedUsbDevice;
-        _disconnectAllBtn.Enabled = hasActive && _cli != null;
-        if (_attachedBody != null && _attachedBody.RowStyles.Count > 1)
         {
             var target = hasActive ? 96f * UiScale : 0f;
-            if (Math.Abs(_attachedBody.RowStyles[1].Height - target) > 0.5f)
-                _attachedBody.RowStyles[1].Height = target;
         }
     }
 
@@ -1450,7 +1408,7 @@ public sealed class MainForm : Form
             if (_attachedCache.Count > 0)
             {
                 title = "All devices in use";
-                body = "Active devices are listed below";
+                body = "";
             }
             else if (BusyElsewhereCopy(out var detail))
             {
@@ -1460,13 +1418,13 @@ public sealed class MainForm : Form
             else
             {
                 title = "No devices yet";
-                body = "Plug in a USB device. Right-click to always connect.";
+                body = "";
             }
             _devicesEmpty.SetCopy(title, body);
         }
         else
         {
-            _devicesEmpty.SetCopy("No devices yet", "Right-click a device to always connect it");
+            _devicesEmpty.SetCopy("No devices yet", "");
             if (selectedBus != null)
             {
                 for (var i = 0; i < _deviceList.Items.Count; i++)
@@ -1835,7 +1793,7 @@ public sealed class MainForm : Form
         Log("USB host stopped sharing.");
 
         SetStatus("Waiting for a USB host on the network…", Accent);
-        _connectHero.Hint = "Start UsbNetBridge on your device to begin.";
+        _connectHero.Hint = "";
         StartPhoneWatch();
 
         await DetachPortsForHostsAsync(hosts.Count > 0 ? hosts : evt.Hosts);
@@ -1914,7 +1872,7 @@ public sealed class MainForm : Form
             _deviceList.Items.Clear();
             _deviceList.EndUpdate();
         }
-        _devicesEmpty.SetCopy("No devices yet", "Plug in a USB device. Right-click to always connect.");
+        _devicesEmpty.SetCopy("No devices yet", "");
         UpdateDevicesEmptyVisible();
     }
 
@@ -2265,7 +2223,7 @@ public sealed class MainForm : Form
     {
         dots = Math.Clamp(dots, 1, 3);
         // Pad with spaces so measured width stays stable (avoids layout flicker).
-        return "Connecting" + new string('.', dots) + new string(' ', 3 - dots);
+        return "Searching" + new string('.', dots) + new string(' ', 3 - dots);
     }
 
     private void UpdateDiscoverStatusText()
@@ -2440,7 +2398,7 @@ public sealed class MainForm : Form
 
                     if (_attachedCache.Count == 0)
                     {
-                        _attachedEmpty.SetCopy("Nothing active", "Double-click a device above to use it");
+                        _attachedEmpty.SetCopy("Nothing active", "Right-click devices for more options");
                         if (!string.IsNullOrWhiteSpace(rawForLog) &&
                             rawForLog.Contains("in use", StringComparison.OrdinalIgnoreCase))
                         {
@@ -2763,7 +2721,6 @@ public sealed class MainForm : Form
             SetStatus("Setup needed — install usbip-win2 first", Danger);
             _connectHero.Hint = "Install usbip-win2, then restart this app. See windows/INSTALL_USBIP_WIN2.md";
             _refreshBtn.Enabled = false;
-            _disconnectAllBtn.Enabled = false;
             return;
         }
 
@@ -2771,7 +2728,7 @@ public sealed class MainForm : Form
         {
             _cli = new UsbipCli(path);
             SetStatus("Ready — find a USB host, then pick a USB device", OkGreen);
-            _connectHero.Hint = "Start UsbNetBridge on your device to begin.";
+            _connectHero.Hint = "";
             _refreshBtn.Enabled = true;
             UpdateDisconnectUi();
         }
@@ -2918,7 +2875,7 @@ public sealed class MainForm : Form
                 Log($"USB host found: {chosen.Host}");
             SetStatus($"USB host found — {chosen.Host}", OkGreen);
             if (!quiet)
-                _connectHero.Hint = "Double-click a device to use it on this PC.";
+                _connectHero.Hint = "Double-click to connect. Right-click for options.";
 
             var refreshed = true;
             if (autoRefresh && _cli != null)
@@ -3072,7 +3029,7 @@ public sealed class MainForm : Form
                     ? $"Server {host} — select a device"
                     : $"Server {host} online — no free devices", OkGreen);
                 if (!quiet)
-                    _connectHero.Hint = "Double-click a device to use it on this PC.";
+                    _connectHero.Hint = "Double-click to connect. Right-click for options.";
             }
             return true;
         }
@@ -3134,13 +3091,9 @@ public sealed class MainForm : Form
             if (interactive)
                 UseWaitCursor = true;
             SetStatus("Connecting device to this PC…", Accent);
-            Log(interactive ? "Preparing…" : $"Auto-connecting {device.DisplayName}…");
-            if (_attachedCache.Count > 0)
-            {
-                try { await _cli!.DetachAllAsync(); } catch { /* ignore */ }
-            }
+            Log(interactive ? "Preparing..." : $"Auto-connecting {device.DisplayName}...");
 
-            Log($"Connecting {device.DisplayName}…");
+            Log($"Connecting {device.DisplayName}...");
             RememberPhoneLabel(device.BusId, device.Vid, device.Pid, device.DisplayName);
             await _cli!.AttachAsync(host, device.BusId);
             await ApplyPortStatusAsync(updateStatusWhenAttached: true);
@@ -3155,22 +3108,49 @@ public sealed class MainForm : Form
             Log("Connected. You can close this window — it stays in the tray.");
             SetStatus("Connected — device ready on this PC", OkGreen);
             _connectHero.Hint = "";
+            
+            if (interactive)
+            {
+                var tipPath = Path.Combine(Path.GetDirectoryName(AutoConnectPath())!, "has_seen_menu_tip.txt");
+                if (!File.Exists(tipPath))
+                {
+                    File.WriteAllText(tipPath, "1");
+                    MessageBox.Show(this, "Device connected!\n\nTip: You can double-click or right-click devices to disconnect them, or right-click available devices to set up Auto-Connect.", "Tip", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
             SaveHost(host);
             StopPhoneWatch();
         }
         catch (Exception ex)
         {
-            Log("Connect failed: " + ex.Message);
-            SetStatus("Connect failed", Danger);
+            var isPermissionDenied = ex.Message.Contains("Device not available", StringComparison.OrdinalIgnoreCase);
+
+            if (isPermissionDenied && !interactive)
+            {
+                var key = AutoConnectKey(device.Vid, device.Pid, device.BusId);
+                if (key.Length > 0)
+                    _autoConnectHoldoff.Add(key);
+            }
+
+            Log(isPermissionDenied ? "Connect failed: Waiting for host permission." : "Connect failed: " + ex.Message);
+            SetStatus(isPermissionDenied ? "Waiting for permission..." : "Connect failed", isPermissionDenied ? Accent : Danger);
+            
             if (interactive)
             {
-                var extra = "";
-                if (_onlineServers.TryGetValue(host, out var srv) && srv.IsBusyElsewhere)
+                if (isPermissionDenied)
                 {
-                    var who = string.IsNullOrWhiteSpace(srv.BusyPc) ? "another PC" : srv.BusyPc;
-                    extra = $"\n\nThis USB host is already in use on {who}.";
+                    MessageBox.Show(this, "This device isn't ready yet.\n\nPlease check your phone and tap 'Allow' so the app can share this specific USB device.", "Permission Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
-                MessageBox.Show(this, ex.Message + extra, "Connect failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                else
+                {
+                    var extra = "";
+                    if (_onlineServers.TryGetValue(host, out var srv) && srv.IsBusyElsewhere)
+                    {
+                        var who = string.IsNullOrWhiteSpace(srv.BusyPc) ? "another PC" : srv.BusyPc;
+                        extra = $"\n\nThis USB host is already in use on {who}.";
+                    }
+                    MessageBox.Show(this, ex.Message + extra, "Connect failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
         finally
@@ -3178,6 +3158,16 @@ public sealed class MainForm : Form
             if (interactive)
                 UseWaitCursor = false;
         }
+    }
+
+    private void ServerListOnMouseUp(object? sender, MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Right) return;
+        var idx = _serverList.IndexFromPoint(e.Location);
+        if (idx < 0) return;
+        _serverList.SelectedIndex = idx;
+        if (_serverList.Items[idx] is not OnlineServer s) return;
+        ShowAutoConnectMenu(_serverList, e.Location, s.Name ?? s.Host, null, null, null, false, null);
     }
 
     private void DeviceListOnMouseUp(object? sender, MouseEventArgs e)
@@ -3211,9 +3201,26 @@ public sealed class MainForm : Form
         var menu = new ContextMenuStrip();
         _autoConnectMenu = menu;
 
-        var isTarget = IsAutoConnectTarget(vid, pid, busId);
-        if (isTarget)
+        var isAttached = owner == _attachedList;
+        var isServer = owner == _serverList;
+        if (isAttached)
         {
+            menu.Items.Add($"Disconnect {name}", null, (_, _) =>
+            {
+                BeginInvoke(new Action(() => _ = DetachSelectedAsync()));
+            });
+            menu.Items.Add("Disconnect all", null, (_, _) =>
+            {
+                BeginInvoke(new Action(() => _ = DetachAllAsync()));
+            });
+            menu.Items.Add("-");
+        }
+
+        if (!isServer)
+        {
+            var isTarget = IsAutoConnectTarget(vid, pid, busId);
+            if (isTarget)
+            {
             menu.Items.Add($"Don’t auto-connect {name}", null, (_, _) => ClearAutoConnect());
         }
         else
@@ -3229,6 +3236,31 @@ public sealed class MainForm : Form
                 BeginInvoke(new Action(() => _ = AttachDeviceAsync(device, interactive: true)));
             });
         }
+        }
+
+        menu.Items.Add("-");
+        menu.Items.Add(isServer ? "Host info..." : "Device info...", null, (_, _) =>
+        {
+            var parts = new List<string> { $"Name: {name}" };
+            if (!string.IsNullOrWhiteSpace(vid) && !string.IsNullOrWhiteSpace(pid))
+                parts.Add($"Hardware ID: {vid}:{pid}");
+            if (!string.IsNullOrWhiteSpace(busId))
+                parts.Add($"Bus ID: {busId}");
+            if (isServer && _serverList.SelectedItem is OnlineServer s)
+            {
+                parts.Add($"Host IP: {s.Host}");
+                if (!string.IsNullOrWhiteSpace(s.StatusLine))
+                    parts.Add($"Status: {s.StatusLine}");
+            }
+            if (owner == _attachedList && _attachedList.SelectedItem is AttachedUsbDevice attached)
+            {
+                if (!string.IsNullOrWhiteSpace(attached.RemoteHost))
+                    parts.Add($"Host IP: {attached.RemoteHost}");
+                parts.Add($"Port: {attached.Port:D2}");
+            }
+            MessageBox.Show(this, string.Join("\n", parts), isServer ? "Host Info" : "Device Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        });
+
         menu.Show(owner, location);
     }
 
@@ -3241,7 +3273,7 @@ public sealed class MainForm : Form
         SaveAutoConnect();
         RefreshAutoConnectChips();
         Log($"Will auto-connect {name} whenever it appears.");
-        _connectHero.Hint = $"Auto-connect is on for {name}. Right-click to turn it off.";
+        _connectHero.Hint = $"Auto-connect is on for {name}. Right-click for options.";
     }
 
     private void ClearAutoConnect()
@@ -3251,7 +3283,7 @@ public sealed class MainForm : Form
         SaveAutoConnect();
         RefreshAutoConnectChips();
         Log(string.IsNullOrWhiteSpace(label) ? "Auto-connect off." : $"Auto-connect off for {label}.");
-        _connectHero.Hint = "Double-click a device to use it on this PC. Right-click to always connect.";
+        _connectHero.Hint = "Double-click to connect. Right-click for options.";
     }
 
     private void RefreshAutoConnectChips()
@@ -3316,17 +3348,11 @@ public sealed class MainForm : Form
 
     private void PruneAutoConnectHoldoff(IEnumerable<RemoteUsbDevice> available)
     {
-        var visible = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        void Add(string? vid, string? pid, string? busId)
-        {
-            var key = AutoConnectKey(vid, pid, busId);
-            if (key.Length > 0) visible.Add(key);
-        }
-        foreach (var d in available)
-            Add(d.Vid, d.Pid, d.BusId);
-        foreach (var a in _attachedCache)
-            Add(a.Vid, a.Pid, a.BusId);
-        _autoConnectHoldoff.RemoveWhere(k => !visible.Contains(k));
+        // To prevent spam loops from UDP broadcast drops (where Android temporarily drops off
+        // the network and comes back, triggering Auto-Connect repeatedly for a rejected device),
+        // we deliberately do NOT prune the holdoff list based on network visibility.
+        // Once a device is rejected, it stays in the holdoff list until the app restarts
+        // or the user manually attempts to connect.
     }
 
     private async Task TryAutoConnectFromDiscoveryAsync(IEnumerable<LanDiscovery.FoundServer> servers)
@@ -3433,7 +3459,6 @@ public sealed class MainForm : Form
         try
         {
             UseWaitCursor = true;
-            _disconnectBtn.Enabled = false;
             _suppressGoneUntilUtc = DateTime.UtcNow.AddSeconds(4);
             SetStatus($"Disconnecting {device.DisplayName}…", Accent);
             Log($"Disconnecting {device.DisplayName} (port {device.Port:D2})…");
@@ -3445,7 +3470,7 @@ public sealed class MainForm : Form
             if (_attachedCache.Count == 0)
             {
                 SetStatus("Ready — find a USB host, then pick a USB device", OkGreen);
-                _connectHero.Hint = "Double-click a device to use it on this PC.";
+                _connectHero.Hint = "Double-click to connect. Right-click for options.";
             }
             await RefreshDevicesAsync(quiet: true);
             Log("Disconnected.");
@@ -3488,8 +3513,8 @@ public sealed class MainForm : Form
             await ApplyPortStatusAsync(updateStatusWhenAttached: false);
             Log("All devices disconnected.");
             SetStatus("Ready — find a USB host, then pick a USB device", OkGreen);
-            _connectHero.Hint = "Start UsbNetBridge on your device to begin.";
-            _devicesEmpty.SetCopy("No devices yet", "Plug in a USB device, then Refresh");
+            _connectHero.Hint = "";
+            _devicesEmpty.SetCopy("No devices yet", "");
             await RefreshDevicesAsync(quiet: true);
         }
         catch (Exception ex)
