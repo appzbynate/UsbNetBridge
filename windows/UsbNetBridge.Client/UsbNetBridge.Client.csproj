@@ -11,6 +11,7 @@
     <StartupObject>UsbNetBridge.Client.Program</StartupObject>
     <RootNamespace>UsbNetBridge.Client</RootNamespace>
     <AssemblyName>UsbNetBridge.Client</AssemblyName>
+    <Version>2.1.0</Version>
     <LangVersion>latest</LangVersion>
     <!-- One output folder so there is only ever one EXE to launch. -->
   </PropertyGroup>

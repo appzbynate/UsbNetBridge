@@ -2,6 +2,8 @@ using System.Drawing.Drawing2D;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Net.Http;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
@@ -62,10 +64,17 @@ public sealed class MainForm : Form
     private readonly SoftEmptyState _attachedEmpty = new();
     private readonly Soft3dButton _clearLogBtn = new();
     private readonly SoftLogView _logBox = new();
+    private Panel? _updateBanner;
 
     private readonly NotifyIcon _tray;
     private readonly SemaphoreSlim _findLock = new(1, 1);
     private readonly Dictionary<string, OnlineServer> _onlineServers = new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly HttpClient _httpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(10)
+    };
+
     /// <summary>Hosts that sent UNB1-off — ignore in-flight beacons for a moment.</summary>
     private readonly Dictionary<string, DateTime> _stoppedHostsUntil = new(StringComparer.OrdinalIgnoreCase);
     private static readonly TimeSpan StoppedHostGrace = TimeSpan.FromSeconds(2.5);
@@ -200,6 +209,7 @@ public sealed class MainForm : Form
         RefreshDriverStatus();
         LoadSavedHost();
         LoadAutoConnect();
+        _ = CheckForUpdatesAsync();
 
         _findBtn.Click += async (_, _) => await FindPhoneAsync(autoRefresh: true, quiet: false);
         _refreshBtn.Click += async (_, _) => await RefreshDevicesAsync();
@@ -520,14 +530,38 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 3,
+            RowCount = 4,
             Padding = new Padding(14),
             BackColor = Color.Transparent,
         };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // update banner
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, HeaderSectionHeight * UiScale)); // header
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // connect
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));   // inventory (fills remaining)
+
+        _updateBanner = new Panel
+        {
+            Dock = DockStyle.Fill,
+            Height = 32,
+            Visible = false,
+            BackColor = Color.FromArgb(0, 110, 200),
+            Margin = new Padding(0, 0, 0, 8),
+            Cursor = Cursors.Hand
+        };
+        var updateLabel = new Label
+        {
+            Text = "New update available! Click here to download.",
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI Semibold", 9.5f),
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Cursor = Cursors.Hand
+        };
+        _updateBanner.Controls.Add(updateLabel);
+        _updateBanner.Click += (_, _) => Process.Start(new ProcessStartInfo("https://github.com/appzbynate/UsbNetBridge/releases/latest") { UseShellExecute = true });
+        updateLabel.Click += (_, _) => Process.Start(new ProcessStartInfo("https://github.com/appzbynate/UsbNetBridge/releases/latest") { UseShellExecute = true });
+        root.Controls.Add(_updateBanner, 0, 0);
 
         var header = new DoubleBufferedPanel
         {
@@ -549,7 +583,7 @@ public sealed class MainForm : Form
         };
         header.Controls.Add(logo);
 
-        root.Controls.Add(header, 0, 0);
+        root.Controls.Add(header, 0, 1);
 
         // Auto-sized connect card so titles/buttons never clip / overlap
         var connect = MakeCard();
@@ -566,7 +600,7 @@ public sealed class MainForm : Form
         UiTheme.BindRoundRegion(_connectHero, 16);
         _connectCard = connect;
         connect.SizeChanged += (_, _) => SyncConnectCardWidths();
-        root.Controls.Add(connect, 0, 1);
+        root.Controls.Add(connect, 0, 2);
 
         // Inventory: servers/devices on top (flexible), Active fixed for two rows + disconnect.
         // No SplitContainer — avoids startup crashes from invalid splitter distances.
@@ -700,7 +734,7 @@ public sealed class MainForm : Form
 
         mid.Controls.Add(topMid, 0, 0);
         mid.Controls.Add(attachedCard, 0, 1);
-        root.Controls.Add(mid, 0, 2);
+        root.Controls.Add(mid, 0, 3);
 
         _logBox.Dock = DockStyle.Fill;
         // removed logCard
@@ -4391,5 +4425,33 @@ public sealed class MainForm : Form
             }
             return new Font("Segoe UI", 10.25f, FontStyle.Italic, GraphicsUnit.Point);
         }
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/appzbynate/UsbNetBridge/releases/latest");
+            req.Headers.UserAgent.ParseAdd("UsbNetBridge-Client/1.0");
+            using var res = await _httpClient.SendAsync(req);
+            if (!res.IsSuccessStatusCode) return;
+            var json = await res.Content.ReadAsStringAsync();
+            var tagMatch = System.Text.RegularExpressions.Regex.Match(json, @"""tag_name"":\s*""v?([0-9]+\.[0-9]+\.[0-9]+)""");
+            if (!tagMatch.Success) return;
+            var latestVersionStr = tagMatch.Groups[1].Value;
+            if (Version.TryParse(latestVersionStr, out var latestVersion))
+            {
+                var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+                if (currentVersion != null && latestVersion > currentVersion)
+                {
+                    Invoke(() =>
+                    {
+                        if (_updateBanner != null)
+                            _updateBanner.Visible = true;
+                    });
+                }
+            }
+        }
+        catch (Exception) { /* ignore network errors */ }
     }
 }
