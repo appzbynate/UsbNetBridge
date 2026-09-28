@@ -1,18 +1,19 @@
 # UsbNetBridge Google Play Store Description
 
 **Title:** UsbNetBridge
-**Short Description:** Share and connect any USB device from your Android to your Windows PC over Wi-Fi.
+**Short Description:** Share and connect USB hardware from your Android to your Windows PC over Wi-Fi.
 
 **Full Description:**
-UsbNetBridge transforms your Android device into a powerful wireless USB hub. Simply plug any USB device into your phone or tablet using an OTG adapter, and instantly stream its data over your local Wi-Fi, VPN, or Hotspot directly to your Windows PC. 
+🚀 Unleash Your Hardware with the Ultimate Wireless USB Server!
+Tired of restrictive, expensive, or outdated USB-sharing software? UsbNetBridge allows you to plug an incredible variety of USB hardware—including 3D printers, SDR radios, flash drives, gamepads, diagnostic tools, and software license dongles—into your Android phone (via an OTG adapter) and wirelessly share them directly to your Windows PC over Wi-Fi, Mobile Hotspot, or VPN.
 
-To your PC, it looks exactly as if the device is plugged directly into the motherboard!
+Powered by the lightning-fast USB/IP protocol, your Windows PC will recognize the remote hardware exactly as if it were physically plugged directly into the motherboard. No driver conflicts, no cable length limits—just pure, native USB passthrough.
 
 **Perfect for:**
-- 🎥 **Wireless Webcams:** Plug a high-end USB webcam or DSLR into your phone and walk around the house while streaming video to your PC.
-- 🔐 **Remote Software Licenses:** Access secure USB license dongles remotely over a VPN while traveling.
 - 🖨️ **Remote Management:** Wirelessly connect your PC to 3D printers, SDR radios, or automotive diagnostic tools without running 50-foot USB cables across the shop.
-- 💾 **File Transfers:** Access hard drives or thumb drives from across the room.
+- 🔐 **Remote Software Licenses:** Access secure USB license dongles remotely over a VPN while traveling.
+- 🎮 **Gaming & Peripherals:** Connect gamepads, mice, or keyboards across the living room.
+- 💾 **File Transfers:** Access hard drives or thumb drives from across the network.
 
 **How it works:**
 1. Plug a USB device into your Android phone (OTG adapter required).
@@ -27,9 +28,6 @@ To your PC, it looks exactly as if the device is plugged directly into the mothe
 - **Rock-Solid Stability:** Utilizes native Android foreground services for uninterrupted background streaming, even when the phone screen is off.
 - **Open Source:** 100% free and open-source (GPL-3.0) so you know your data is secure.
 
-**Requirements:**
-- Android 8.0 or newer.
-- A USB OTG (On-The-Go) adapter or cable.
-- The free UsbNetBridge Windows Client (available on GitHub).
+*Note: Due to Android USB API limitations, Isochronous (ISOC) video/audio devices such as Webcams and USB Microphones are currently not supported.*
 
 *Stop tripping over USB cables. Make your hardware wireless with UsbNetBridge today!*
