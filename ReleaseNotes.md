@@ -1,4 +1,4 @@
-# UsbNetBridge v1.1.0
+# UsbNetBridge v2.1.0
 
 ## What's New in this Release
 

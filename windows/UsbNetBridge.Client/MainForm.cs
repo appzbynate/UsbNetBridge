@@ -646,23 +646,25 @@ public sealed class MainForm : Form
         _savedRow.Controls.Add(PadBtn(_saveHostBtn));
         _savedRow.Controls.Add(PadBtn(_removeHostBtn));
 
-        var serverFooter = new BufferedTableLayoutPanel
+        var serverFooter = new BufferedFlowLayoutPanel
         {
             Dock = DockStyle.Top,
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 1,
-            RowCount = 3,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
             BackColor = CardFace,
             Margin = new Padding(0),
             Padding = new Padding(0, 6, 0, 0),
         };
-        serverFooter.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        for (var i = 0; i < 3; i++)
-            serverFooter.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        serverFooter.Controls.Add(_manualToggle, 0, 0);
-        serverFooter.Controls.Add(_manualRow, 0, 1);
-        serverFooter.Controls.Add(_savedRow, 0, 2);
+        serverFooter.Controls.Add(_manualToggle);
+        serverFooter.Controls.Add(_manualRow);
+        serverFooter.Controls.Add(_savedRow);
+        serverFooter.Resize += (_, _) => 
+        {
+            _manualRow.Width = serverFooter.ClientSize.Width;
+            _savedRow.Width = serverFooter.ClientSize.Width;
+        };
 
         var serversCard = MakeSectionCard("USB hosts", _serverList, _serversEmpty, footer: serverFooter);
         serversCard.Margin = new Padding(0, 0, 0, 10);
