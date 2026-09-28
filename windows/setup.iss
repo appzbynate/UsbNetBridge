@@ -27,7 +27,11 @@ Name: "{group}\{cm:UninstallProgram,UsbNetBridge}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\UsbNetBridge"; Filename: "{app}\UsbNetBridge.Client.exe"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "UsbNetBridge"; ValueData: """{app}\UsbNetBridge.Client.exe"""; Tasks: startup
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "UsbNetBridge"; ValueData: """{app}\UsbNetBridge.Client.exe"" --tray"; Tasks: startup
 
 [Run]
+Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""UsbNetBridge"" dir=in action=allow program=""{app}\UsbNetBridge.Client.exe"" enable=yes profile=any"; Flags: runhidden
 Filename: "{app}\UsbNetBridge.Client.exe"; Description: "{cm:LaunchProgram,UsbNetBridge}"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""UsbNetBridge"""; Flags: runhidden; RunOnceId: "RemoveFirewallRule"
