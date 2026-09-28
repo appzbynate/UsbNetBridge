@@ -63,6 +63,14 @@ class MainActivity : AppCompatActivity() {
         binding.stopButton.setOnClickListener { stopUsbIpServer() }
         binding.refreshButton.setOnClickListener { refreshDevices() }
         binding.copyEndpointButton.setOnClickListener { copyEndpointToClipboard() }
+        binding.getWindowsClientButton.setOnClickListener {
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "UsbNetBridge PC App")
+                putExtra(Intent.EXTRA_TEXT, "Download the UsbNetBridge Windows PC App here:\nhttps://github.com/appzbynate/UsbNetBridge/releases/latest")
+            }
+            startActivity(Intent.createChooser(shareIntent, "Share PC Download Link"))
+        }
         binding.showLogsButton.setOnClickListener { showLogsDialog() }
 
         ensureNotificationPermission()

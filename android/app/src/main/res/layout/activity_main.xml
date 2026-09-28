@@ -263,6 +263,20 @@
                         android:textSize="16sp"
                         android:textStyle="bold" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/getWindowsClientButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_btn_pill_dark"
+                    app:backgroundTint="@null"
+                    android:stateListAnimator="@null"
+                    android:text="Get the Windows PC App"
+                    android:textAllCaps="false"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Section 2: "2. USB devices" -->
