@@ -1,6 +1,6 @@
 [Setup]
 AppName=UsbNetBridge
-AppVersion=2.1.0
+AppVersion=2.1.2
 AppPublisher=appzbynate
 DefaultDirName={autopf}\UsbNetBridge
 DefaultGroupName=UsbNetBridge
