@@ -352,6 +352,16 @@ public sealed class MainForm : Form
         base.WndProc(ref m);
     }
 
+    protected override void SetVisibleCore(bool value)
+    {
+        if (_startInTray && !IsHandleCreated)
+        {
+            CreateHandle();
+            value = false;
+        }
+        base.SetVisibleCore(value);
+    }
+
     protected override void OnLoad(EventArgs e)
     {
         base.OnLoad(e);

@@ -23,7 +23,6 @@ Source: "UsbNetBridge.Client\bin\Release\net8.0-windows\win-x64\publish\*"; Dest
 
 [Icons]
 Name: "{group}\UsbNetBridge"; Filename: "{app}\UsbNetBridge.Client.exe"
-Name: "{group}\{cm:UninstallProgram,UsbNetBridge}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\UsbNetBridge"; Filename: "{app}\UsbNetBridge.Client.exe"; Tasks: desktopicon
 
 [Registry]
